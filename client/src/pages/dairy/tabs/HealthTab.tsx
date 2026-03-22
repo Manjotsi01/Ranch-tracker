@@ -15,7 +15,7 @@ import type { VaccinationRecord, TreatmentRecord } from '../../../types/index'
 interface Props { animalId: string }
 
 export function HealthTab({ animalId }: Props) {
-  const { data, vaccinations, treatments, loading, error, fetch, addVaccination, addTreatment } = useHealth(animalId)
+  const { data, vaccinations, treatments, loading, fetch, addVaccination, addTreatment } = useHealth(animalId)
   const [showVacc, setShowVacc] = useState(false)
   const [showTreat, setShowTreat] = useState(false)
   const [saving, setSaving] = useState(false)
