@@ -42,22 +42,26 @@ export default function CropDetail() {
   const staticCrop = allStaticCrops.find((c) => c.id === cropId);
 
   const loadData = useCallback(async () => {
-    if (!cropId) return;
-    setLoadingCrop(true);
-    setError(null);
-    try {
-      const [cropRes, seasonsData] = await Promise.all([
-        api.get<{ data: Crop }>(`/agriculture/crops/${cropId}`).catch(() => null),
-        fetchSeasonsByCrop(cropId),
-      ]);
-      if (cropRes) setCrop(cropRes.data.data);
-      setSeasons(seasonsData);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to load crop data');
-    } finally {
-      setLoadingCrop(false);
-    }
-  }, [cropId, fetchSeasonsByCrop]);
+  if (!cropId) return;
+
+  setLoadingCrop(true);
+  setError(null);
+
+  try {
+    const [cropRes, seasonsData] = await Promise.all([
+      api.get<{ data: Crop }>(`/agriculture/crops/${cropId}`),
+      fetchSeasonsByCrop(cropId)
+    ]);
+
+    setCrop(cropRes.data.data);
+    setSeasons(seasonsData || []);
+
+  } catch (e: unknown) {
+    setError(e instanceof Error ? e.message : 'Failed to load crop data');
+  } finally {
+    setLoadingCrop(false);
+  }
+}, [cropId, fetchSeasonsByCrop]);
 
   useEffect(() => { loadData(); }, [loadData]);
 

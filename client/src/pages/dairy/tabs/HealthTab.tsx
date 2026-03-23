@@ -58,7 +58,7 @@ export function HealthTab({ animalId }: Props) {
   const vaccColumns = [
     { key: 'vaccineName', header: 'Vaccine', render: (r: VaccinationRecord) => <span className="font-medium">{r.vaccineName}</span> },
     { key: 'date', header: 'Date Given', render: (r: VaccinationRecord) => formatDate(r.date) },
-    { key: 'nextDueDate', header: 'Next Due', render: (r: VaccinationRecord) => formatDate(r.nextDueDate) },
+{ key: 'nextDueDate', header: 'Next Due', render: (r: VaccinationRecord) => r.nextDueDate ? formatDate(r.nextDueDate) : '—' },
     { key: 'status', header: 'Status', render: (r: VaccinationRecord) => <Badge variant={r.status}>{r.status}</Badge> },
    { key: 'cost', header: 'Cost', render: (r: VaccinationRecord) => r.cost != null ? formatCurrency(r.cost) : '—' },
     { key: 'veterinarianName', header: 'Vet', render: (r: VaccinationRecord) => r.veterinarianName ?? '—' },
@@ -68,8 +68,8 @@ export function HealthTab({ animalId }: Props) {
     { key: 'date', header: 'Date', render: (r: TreatmentRecord) => formatDate(r.date) },
     { key: 'diagnosis', header: 'Diagnosis', render: (r: TreatmentRecord) => <span className="font-medium">{r.diagnosis}</span> },
     { key: 'medicines', header: 'Medicines', render: (r: TreatmentRecord) => r.medicines?.join(', ') ?? '—' },
-    { key: 'cost', header: 'Cost', render: (r: TreatmentRecord) => formatCurrency(r.cost) },
-    { key: 'followUpDate', header: 'Follow Up', render: (r: TreatmentRecord) => formatDate(r.followUpDate) },
+{ key: 'cost', header: 'Cost', render: (r: TreatmentRecord) => formatCurrency(r.cost ?? 0) },
+{ key: 'followUpDate', header: 'Follow Up', render: (r: TreatmentRecord) => r.followUpDate ? formatDate(r.followUpDate) : '—' },
   ]
 
   // Overdue & upcoming alerts
@@ -81,9 +81,9 @@ export function HealthTab({ animalId }: Props) {
       {/* Summary stats */}
       {data && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-          <StatCard label="Vaccination Cost" value={formatCurrency(data.totalVaccinationCost)} icon={<Shield className="w-4 h-4" />} iconBg="bg-green-50" iconColor="text-green-600" />
-          <StatCard label="Treatment Cost" value={formatCurrency(data.totalTreatmentCost)} icon={<Stethoscope className="w-4 h-4" />} iconBg="bg-red-50" iconColor="text-red-600" />
-          <StatCard label="Total Health Cost" value={formatCurrency((data.totalVaccinationCost ?? 0) + (data.totalTreatmentCost ?? 0))} icon={<AlertTriangle className="w-4 h-4" />} iconBg="bg-orange-50" iconColor="text-orange-600" />
+<StatCard label="Vaccination Cost" value={formatCurrency(data.totalVaccinationCost ?? 0)} icon={<Shield className="w-4 h-4" />} accentColor="#10b981" />
+<StatCard label="Treatment Cost" value={formatCurrency(data.totalTreatmentCost ?? 0)} icon={<Stethoscope className="w-4 h-4" />} accentColor="#ef4444" />
+<StatCard label="Total Health Cost" value={formatCurrency((data.totalVaccinationCost ?? 0) + (data.totalTreatmentCost ?? 0))} icon={<AlertTriangle className="w-4 h-4" />} accentColor="#f59e0b" />
         </div>
       )}
 
@@ -93,7 +93,7 @@ export function HealthTab({ animalId }: Props) {
           <p className="text-xs font-semibold text-red-700 mb-1">⚠ Overdue Vaccinations</p>
           {overdue.map((v) => (
             <p key={v._id} className="text-sm text-red-700">
-              {v.vaccineName} — was due {formatDate(v.nextDueDate)}
+              {v.vaccineName} — was due {v.nextDueDate ? formatDate(v.nextDueDate) : 'Unknown'}
             </p>
           ))}
         </div>
@@ -103,7 +103,7 @@ export function HealthTab({ animalId }: Props) {
           <p className="text-xs font-semibold text-yellow-700 mb-1">📅 Upcoming Vaccinations</p>
           {due.map((v) => (
             <p key={v._id} className="text-sm text-yellow-700">
-              {v.vaccineName} — due {formatDate(v.nextDueDate)}
+              {v.vaccineName} — due {v.nextDueDate ? formatDate(v.nextDueDate) : 'Unknown'}
             </p>
           ))}
         </div>

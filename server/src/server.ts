@@ -1,5 +1,3 @@
-// Path: ranch-tracker/server/src/server.ts
-
 import dotenv from 'dotenv';
 
 import express from 'express';
@@ -19,7 +17,7 @@ const PORT     = process.env.PORT     || 5000;
 const BASE_API = process.env.BASE_API || '/api';
 
 app.use(cors({
-  origin: process.env.CLIENT_ORIGIN || 'http://localhost:3000',
+  origin: process.env.CLIENT_ORIGIN || "*",
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -64,3 +62,4 @@ const startServer = async () => {
 startServer();
 
 export default app;
+
