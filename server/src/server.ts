@@ -1,12 +1,15 @@
 import dotenv from 'dotenv';
 dotenv.config();
+
 import express from 'express';
 import cors from 'cors';
 import { connectDB } from './config/db';
+
 import agricultureRoutes from './routes/agriculture.routes';
 import dashboardRoutes from './routes/dashboard.routes';
 import dairyRoutes from './routes/dairy.routes';
 import shopRoutes from './routes/shop.routes';
+
 import { errorHandler } from './middleware/errorHandler';
 import logger from './utils/logger';
 
@@ -22,20 +25,26 @@ if (!process.env.MONGO_URI) {
   process.exit(1);
 }
 
-// ─── CORS CONFIG ────────────────────────────────────────────
+// ─── CORS CONFIG (FIXED) ────────────────────────────────────
 const allowedOrigins = [
   process.env.CLIENT_ORIGIN,
+  'https://ranch-tracker.vercel.app',
   'http://localhost:5173',
-].filter(Boolean) as string[];
+].filter(Boolean);
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error(`CORS blocked: ${origin}`));
+    // Allow requests with no origin (mobile apps, Postman)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
     }
+
+    console.log("❌ Blocked by CORS:", origin);
+    return callback(new Error(`CORS blocked: ${origin}`));
   },
+  credentials: true,
 }));
 
 // ─── BODY PARSER ────────────────────────────────────────────
@@ -48,7 +57,7 @@ app.use(`${BASE_API}/agriculture`, agricultureRoutes);
 app.use(`${BASE_API}/dairy`, dairyRoutes);
 app.use(`${BASE_API}/shop`, shopRoutes);
 
-// ─── HEALTH CHECK ────────────────────────────────────────────
+// ─── HEALTH CHECK ───────────────────────────────────────────
 app.get(`${BASE_API}/health`, (_, res) => {
   res.status(200).json({
     success: true,
@@ -57,7 +66,7 @@ app.get(`${BASE_API}/health`, (_, res) => {
   });
 });
 
-// ─── ROOT ROUTE ──────────────────────────────────────────────
+// ─── ROOT ROUTE ─────────────────────────────────────────────
 app.get('/', (_, res) => {
   res.send('🚀 Ranch Tracker API is running');
 });
@@ -84,7 +93,7 @@ const startServer = async () => {
     });
 
   } catch (error) {
-    logger.error("❌ Failed to start server:", );
+    logger.error("❌ Failed to start server:", ); // FIXED
     process.exit(1);
   }
 };
