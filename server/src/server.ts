@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-dotenv.config(); 
+dotenv.config();
 import express from 'express';
 import cors from 'cors';
 import { connectDB } from './config/db';
@@ -16,16 +16,26 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const BASE_API = process.env.BASE_API || '/api';
 
-// ─── VALIDATE ENV (IMPORTANT) ───────────────────────────────
+// ─── VALIDATE ENV ───────────────────────────────────────────
 if (!process.env.MONGO_URI) {
   console.error("❌ MONGO_URI is missing in environment variables");
   process.exit(1);
 }
 
-// ─── CORS CONFIG (PRODUCTION SAFE) ──────────────────────────
+// ─── CORS CONFIG ────────────────────────────────────────────
+const allowedOrigins = [
+  process.env.CLIENT_ORIGIN,
+  'http://localhost:5173',
+].filter(Boolean) as string[];
+
 app.use(cors({
-  origin: process.env.CLIENT_ORIGIN || "*",
-  credentials: true,
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS blocked: ${origin}`));
+    }
+  },
 }));
 
 // ─── BODY PARSER ────────────────────────────────────────────
@@ -38,7 +48,7 @@ app.use(`${BASE_API}/agriculture`, agricultureRoutes);
 app.use(`${BASE_API}/dairy`, dairyRoutes);
 app.use(`${BASE_API}/shop`, shopRoutes);
 
-// ─── HEALTH CHECK (VERY IMPORTANT FOR RENDER) ───────────────
+// ─── HEALTH CHECK ────────────────────────────────────────────
 app.get(`${BASE_API}/health`, (_, res) => {
   res.status(200).json({
     success: true,
@@ -47,7 +57,7 @@ app.get(`${BASE_API}/health`, (_, res) => {
   });
 });
 
-// Root route (helps avoid "No open ports detected")
+// ─── ROOT ROUTE ──────────────────────────────────────────────
 app.get('/', (_, res) => {
   res.send('🚀 Ranch Tracker API is running');
 });

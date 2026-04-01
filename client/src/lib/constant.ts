@@ -92,9 +92,9 @@ export const VEGETABLE_GROUPS = {
       { id: 'broccoli',   name: 'Broccoli',         localName: 'Broccoli' },
       { id: 'artichoke',  name: 'Artichoke',        localName: 'Artichoke' },
       { id: 'peas',       name: 'Peas',             localName: 'Matar' },
-      { id: 'french_beans',name:'French Beans',     localName: 'Sem' },
+      { id: 'french_beans',name:'French Beans',     localName: 'falia' },
       { id: 'cowpea',     name: 'Cowpea',           localName: 'Lobia' },
-      { id: 'bottle_gourd',name:'Bottle Gourd',     localName: 'Lauki' },
+      { id: 'bottle_gourd',name:'Bottle Gourd',     localName: 'Allah/ kaddu' },
       { id: 'bitter_gourd',name:'Bitter Gourd',     localName: 'Karela' },
       { id: 'ridge_gourd',name: 'Ridge Gourd',      localName: 'Tori' },
       { id: 'pumpkin',    name: 'Pumpkin',          localName: 'Kaddu' },
@@ -235,6 +235,7 @@ export const VACCINE_STATUSES = [
   { value: 'GIVEN',   label: 'Given'   },
   { value: 'DUE',     label: 'Due'     },
   { value: 'OVERDUE', label: 'Overdue' },
+  { value: 'doze',    label:  'doze'  },
 ] as const
  
 // ─── Fodder / Feed ────────────────────────────────────────────────────────────
