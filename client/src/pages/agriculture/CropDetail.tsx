@@ -77,7 +77,7 @@ const loadData = useCallback(async () => {
   const totalRevenue = seasons.reduce((s, se) => s + (se.totalRevenue ?? 0), 0);
   const totalProfit  = totalRevenue - totalExpense;
   const totalArea    = seasons.reduce((s, se) => s + (se.areaSown ?? 0), 0);
-
+  
   const filteredSeasons = statusFilter === 'ALL'
     ? seasons
     : seasons.filter((s) => s.status === statusFilter);
