@@ -10,12 +10,9 @@ import type { DashboardStats,
   CropSeason,
   Animal, 
   HerdSummary,
-  Batch, 
-  Sale, 
   Product, 
-  ShopStats,
-  RevenueDataPoint,
-  ProductSaleBreakdown,
+  CartItem,
+  PaymentMode
  } from '../types/index';
 
 
@@ -152,130 +149,62 @@ export const useUIStore = create<UIStore>((set) => ({
 }))
  
 
-// ─── Shop Store ──────────────────────────────────────────────────────────────
-interface ShopState {
-  stats: ShopStats | null
-  batches: Batch[]
-  products: Product[]
-  sales: Sale[]
-  revenueChart: RevenueDataPoint[]
-  productBreakdown: ProductSaleBreakdown[]
-  loading: boolean
-  error: string | null
-
-  setStats: (s: ShopStats) => void
-  setBatches: (b: Batch[]) => void
-  setProducts: (p: Product[]) => void
-  setSales: (s: Sale[]) => void
-  setRevenueChart: (d: RevenueDataPoint[]) => void
-  setProductBreakdown: (d: ProductSaleBreakdown[]) => void
-  setLoading: (v: boolean) => void
-  setError: (e: string | null) => void
-  addBatch: (b: Batch) => void
-  updateBatch: (id: string, b: Partial<Batch>) => void
-  removeBatch: (id: string) => void
-  addSale: (s: Sale) => void
-}
-
-export const useShopStore = create<ShopState>((set) => ({
-  stats: null,
-  batches: [],
-  products: [],
-  sales: [],
-  revenueChart: [],
-  productBreakdown: [],
-  loading: false,
-  error: null,
-
-  setStats: (stats) => set({ stats }),
-  setBatches: (batches) => set({ batches }),
-  setProducts: (products) => set({ products }),
-  setSales: (sales) => set({ sales }),
-  setRevenueChart: (revenueChart) => set({ revenueChart }),
-  setProductBreakdown: (productBreakdown) => set({ productBreakdown }),
-  setLoading: (loading) => set({ loading }),
-  setError: (error) => set({ error }),
-  addBatch: (b) => set((s) => ({ batches: [b, ...s.batches] })),
-  updateBatch: (id, patch) =>
-    set((s) => ({
-      batches: s.batches.map((b) => (b._id === id ? { ...b, ...patch } : b)),
-    })),
-  removeBatch: (id) =>
-    set((s) => ({ batches: s.batches.filter((b) => b._id !== id) })),
-  addSale: (sale) => set((s) => ({ sales: [sale, ...s.sales] })),
-}))
-
-// ─── POS Cart Store ───────────────────────────────────────────────────────────
-export interface CartItem {
-  id: string
-  productType: string
-  productName: string
-  batchId: string
-  batchCode: string
-  unitPrice: number
-  quantity: number
-  discount: number
-  unit: string
-}
-
+// ── Cart Store (POS) ──────────────────────────────────────────────────────────
 interface CartState {
   items: CartItem[]
-  paymentMode: 'CASH' | 'UPI' | 'CARD' | 'CREDIT'
+  paymentMode: PaymentMode
   customerName: string
-  customerId: string
-  addItem: (item: CartItem) => void
-  updateItem: (id: string, patch: Partial<CartItem>) => void
-  removeItem: (id: string) => void
-  clearCart: () => void
-  setPaymentMode: (m: CartState['paymentMode']) => void
-  setCustomer: (name: string, id?: string) => void
-  getTotal: () => number
-  getItemCount: () => number
+  addItem:      (product: Product, qty: number) => void
+  updateQty:    (id: string, qty: number) => void
+  removeItem:   (id: string) => void
+  clearCart:    () => void
+  setPayment:   (mode: PaymentMode) => void
+  setCustomer:  (name: string) => void
+  total:        () => number
+  itemCount:    () => number
 }
 
 export const useCartStore = create<CartState>((set, get) => ({
-  items: [],
-  paymentMode: 'CASH',
+  items:        [],
+  paymentMode:  'CASH',
   customerName: '',
-  customerId: '',
 
-  addItem: (item) =>
+  addItem: (product, qty) =>
     set((s) => {
-      const exists = s.items.find(
-        (i) => i.batchId === item.batchId && i.productType === item.productType
-      )
+      const exists = s.items.find((i) => i.productId === product._id)
       if (exists) {
         return {
           items: s.items.map((i) =>
-            i.id === exists.id ? { ...i, quantity: i.quantity + item.quantity } : i
+            i.productId === product._id
+              ? { ...i, quantity: i.quantity + qty, lineTotal: (i.quantity + qty) * i.unitPrice }
+              : i
           ),
         }
       }
-      return { items: [...s.items, item] }
+      return {
+        items: [...s.items, {
+          id:          crypto.randomUUID(),
+          productId:   product._id,
+          productName: product.name,
+          unit:        product.unit,
+          unitPrice:   product.mrp,
+          quantity:    qty,
+          lineTotal:   qty * product.mrp,
+        }],
+      }
     }),
 
-  updateItem: (id, patch) =>
+  updateQty: (id, qty) =>
     set((s) => ({
-      items: s.items.map((i) => (i.id === id ? { ...i, ...patch } : i)),
+      items: qty <= 0
+        ? s.items.filter((i) => i.id !== id)
+        : s.items.map((i) => i.id === id ? { ...i, quantity: qty, lineTotal: qty * i.unitPrice } : i),
     })),
 
-  removeItem: (id) =>
-    set((s) => ({ items: s.items.filter((i) => i.id !== id) })),
-
-  clearCart: () =>
-    set({ items: [], customerName: '', customerId: '', paymentMode: 'CASH' }),
-
-  setPaymentMode: (paymentMode) => set({ paymentMode }),
-  setCustomer: (customerName, customerId = '') => set({ customerName, customerId }),
-
-  getTotal: () => {
-    const { items } = get()
-    return items.reduce((sum, item) => {
-      const lineTotal = item.unitPrice * item.quantity
-      const discounted = lineTotal - (lineTotal * item.discount) / 100
-      return sum + discounted
-    }, 0)
-  },
-
-  getItemCount: () => get().items.reduce((s, i) => s + i.quantity, 0),
+  removeItem:  (id)   => set((s) => ({ items: s.items.filter((i) => i.id !== id) })),
+  clearCart:   ()     => set({ items: [], customerName: '', paymentMode: 'CASH' }),
+  setPayment:  (mode) => set({ paymentMode: mode }),
+  setCustomer: (name) => set({ customerName: name }),
+  total:       ()     => +get().items.reduce((s, i) => s + i.lineTotal, 0).toFixed(2),
+  itemCount:   ()     => get().items.reduce((s, i) => s + i.quantity, 0),
 }))

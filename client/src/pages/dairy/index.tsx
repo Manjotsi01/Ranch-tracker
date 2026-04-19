@@ -13,12 +13,39 @@ export default function DairyPage() {
 
   const hs = herdSummary
 
-  const kpis = [
-    { label: 'Total Herd',     value: hs?.totalAnimals ?? '—',               sub: 'registered animals',  color: '#2563eb', bg: '#eff6ff' },
-    { label: 'Milking Today',  value: hs?.milkingCount ?? '—',               sub: 'in production',        color: '#0891b2', bg: '#ecfeff' },
-    { label: "Today's Yield",  value: hs ? formatLiters(hs.todayMilk) : '—', sub: 'morning + evening',   color: '#059669', bg: '#ecfdf5' },
-    { label: 'Monthly Yield',  value: hs ? formatLiters(hs.monthlyMilk) : '—', sub: 'this month total',  color: '#7c3aed', bg: '#f5f3ff' },
-  ]
+type KPI = {
+  label: string;
+  value: string | number;
+  color?: string;
+  sub?: string;
+};
+
+const kpis: KPI[] = [
+  {
+    label: 'Total Herd',
+    value: hs?.totalAnimals ?? '—',
+    color: '#0f172a',
+    sub: 'Animals',
+  },
+  {
+    label: 'Milking Today',
+    value: hs?.milkingCount ?? '—',
+    color: '#16a34a',
+    sub: 'Active',
+  },
+  {
+    label: "Today's Yield",
+    value: hs ? formatLiters(hs.todayMilk) : '—',
+    color: '#2563eb',
+    sub: 'Liters',
+  },
+  {
+    label: 'Monthly Yield',
+    value: hs ? formatLiters(hs.monthlyMilk) : '—',
+    color: '#7c3aed',
+    sub: 'Total',
+  },
+];
 
   const subsectors = [
     {

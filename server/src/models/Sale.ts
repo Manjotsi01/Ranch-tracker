@@ -1,40 +1,38 @@
-// Path: ranch-tracker/server/src/models/Sale.ts
+// server/models/Sale.js
+const { Schema, model } = require('mongoose')
+const { nanoid } = require('nanoid')
 
-import mongoose from 'mongoose';
-import { nanoid } from 'nanoid';
+const SaleItemSchema = new Schema({
+  productId:    { type: Schema.Types.ObjectId, ref: 'Product' },
+  name:         { type: String, required: true },  // snapshot at time of sale
+  unit:         { type: String, required: true },
+  qty:          { type: Number, required: true, min: 0 },
+  pricePerUnit: { type: Number, required: true },
+  subtotal:     { type: Number, required: true },
+}, { _id: false })
 
-const saleItemEmbedSchema = new mongoose.Schema(
-  {
-    productId:  { type: String, required: true },
-    batchId:    { type: mongoose.Schema.Types.ObjectId, ref: 'Batch', required: true },
-    quantity:   { type: Number, required: true, min: 1 },
-    unitPrice:  { type: Number, required: true },
-    discount:   { type: Number, default: 0 },
-    total:      { type: Number, required: true },
-  },
-  { _id: false }
-);
+const SaleSchema = new Schema({
+  receiptNo:   { type: String, unique: true, default: () => `RCP-${nanoid(8).toUpperCase()}` },
+  type:        { type: String, enum: ['RETAIL', 'WHOLESALE'], required: true },
+  date:        { type: Date, default: Date.now },
 
-const saleSchema = new mongoose.Schema(
-  {
-    saleId: {
-      type: String,
-      unique: true,
-      default: () => `SALE-${Date.now().toString(36).toUpperCase()}-${nanoid(4).toUpperCase()}`,
-    },
-    dateTime:     { type: Date, default: Date.now, required: true },
-    customerId:   { type: String },
-    customerName: { type: String },
-    items:        { type: [saleItemEmbedSchema], required: true },
-    paymentMode:  { type: String, enum: ['CASH', 'UPI', 'CARD', 'CREDIT'], required: true },
-    totalAmount:  { type: Number, required: true },
-    createdBy:    { type: String, default: 'system' },
-  },
-  { timestamps: true }
-);
+  // Retail fields
+  items:       { type: [SaleItemSchema], default: [] },
+  paymentMode: { type: String, enum: ['CASH', 'UPI', 'CREDIT'], default: 'CASH' },
 
-saleSchema.index({ dateTime: -1 });
-saleSchema.index({ paymentMode: 1 });
+  // Wholesale-only fields (null on retail)
+  buyerName:      { type: String, default: null },
+  buyerId:        { type: Schema.Types.ObjectId, ref: 'Buyer', default: null },
+  quantityLiters: { type: Number, default: null },
+  fatReading:     { type: Number, default: null },
+  snfReading:     { type: Number, default: null },
+  ratePerLiter:   { type: Number, default: null },
+  paymentStatus:  { type: String, enum: ['PENDING', 'RECEIVED'], default: 'RECEIVED' },
 
-export const SaleModel = mongoose.model('Sale', saleSchema);
-export default SaleModel;
+  totalAmount: { type: Number, required: true },
+}, { timestamps: true })
+
+SaleSchema.index({ date: -1 })
+SaleSchema.index({ type: 1, date: -1 })
+
+module.exports = model('Sale', SaleSchema)

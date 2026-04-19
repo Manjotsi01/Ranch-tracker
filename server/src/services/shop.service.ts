@@ -1,253 +1,441 @@
-import mongoose from 'mongoose';
-import Batch from '../models/Batch';
-import { SaleModel as Sale } from '../models/Sale';
+import mongoose from 'mongoose'
+import MilkEntry   from '../models/MilkEntry'
+import Expense     from '../models/Expense'
+import Product     from '../models/Product'
+import Sale        from '../models/Sale'
+import WholesaleSale from '../models/WholesaleSale'
 
-// ── Helper ────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// MILK INVENTORY
+// ═══════════════════════════════════════════════════════════════
 
-const startOfDay = (d = new Date()) =>
-  new Date(d.getFullYear(), d.getMonth(), d.getDate());
+export const addMilkEntry = async (data: {
+  date: string
+  shift: 'MORNING' | 'EVENING'
+  quantityLiters: number
+  fat?: number
+  snf?: number
+  source: 'OWN' | 'PURCHASED'
+  notes?: string
+}) => {
+  // One entry per date+shift — upsert so re-submitting a morning entry overwrites it
+  return MilkEntry.findOneAndUpdate(
+    { date: new Date(data.date), shift: data.shift },
+    { $set: data },
+    { upsert: true, new: true, runValidators: true }
+  )
+}
 
-const endOfDay = (d = new Date()) =>
-  new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+export const getMilkEntries = async (params: {
+  from?: string
+  to?: string
+  month?: string   // "2025-04" → auto expand to date range
+}) => {
+  const filter: Record<string, unknown> = {}
 
-// ── Stats ─────────────────────────────────────────────────────────────────────
+  if (params.month) {
+    const [y, m] = params.month.split('-').map(Number)
+    filter.date = {
+      $gte: new Date(y, m - 1, 1),
+      $lte: new Date(y, m, 0, 23, 59, 59),
+    }
+  } else if (params.from || params.to) {
+    filter.date = {
+      ...(params.from ? { $gte: new Date(params.from) } : {}),
+      ...(params.to   ? { $lte: new Date(params.to)   } : {}),
+    }
+  }
 
-export const getStats = async () => {
-  const today = startOfDay();
+  return MilkEntry.find(filter).sort({ date: -1, shift: 1 })
+}
 
-  const [totalBatches, activeBatches, todaySales, totalRevenue] = await Promise.all([
-    Batch.countDocuments(),
-    Batch.countDocuments({ status: { $in: ['PROCESSING', 'READY'] } }),
-    Sale.countDocuments({ dateTime: { $gte: today } }),
-    Sale.aggregate([{ $group: { _id: null, total: { $sum: '$totalAmount' } } }]),
-  ]);
+export const getMilkStock = async (date?: string) => {
+  const day = date ? new Date(date) : new Date()
+  const start = new Date(day.getFullYear(), day.getMonth(), day.getDate())
+  const end   = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 23, 59, 59)
+
+  const [entries, soldToday] = await Promise.all([
+    MilkEntry.aggregate([
+      { $match: { date: { $gte: start, $lte: end } } },
+      { $group: { _id: null, total: { $sum: '$quantityLiters' } } },
+    ]),
+    WholesaleSale.aggregate([
+      { $match: { date: { $gte: start, $lte: end } } },
+      { $group: { _id: null, total: { $sum: '$quantityLiters' } } },
+    ]),
+  ])
+
+  const collected  = entries[0]?.total    ?? 0
+  const wholesaled = soldToday[0]?.total  ?? 0
 
   return {
-    totalBatches,
-    activeBatches,
-    todaySales,
-    totalRevenue: totalRevenue[0]?.total ?? 0,
-  };
-};
-
-// ── Batches ───────────────────────────────────────────────────────────────────
-
-export const getBatches = async (
-  query: { status?: string; productType?: string } = {},
-) => {
-  const filter: Record<string, unknown> = {};
-  if (query.status)      filter.status      = query.status;
-  if (query.productType) filter.productType = query.productType;
-  return Batch.find(filter).sort({ productionDate: -1 });
-};
-
-export const getBatchById = async (id: string) => {
-  return Batch.findById(id);
-};
-
-export const createBatch = async (data: unknown) => {
-  const batch = await Batch.create(data);
-  // Initialise stockRemaining from output if not supplied
-  if (!batch.stockRemaining) {
-   batch.stockRemaining = (batch.output?.quantityProduced ?? 0) - (batch.output?.wastage ?? 0);
-    await batch.save();
+    collected,
+    wholesaled,
+    available: Math.max(0, collected - wholesaled),
+    date: start,
   }
-  return batch;
-};
+}
 
-export const updateBatch = async (id: string, data: unknown) => {
-  return Batch.findByIdAndUpdate(id, data as object, {
-    new: true,
-    runValidators: true,
-  });
-};
+// ═══════════════════════════════════════════════════════════════
+// EXPENSES
+// ═══════════════════════════════════════════════════════════════
 
-export const deleteBatch = async (id: string) => {
-  return Batch.findByIdAndDelete(id);
-};
+export const upsertExpense = async (data: {
+  date: string
+  feed?: number
+  labor?: number
+  transport?: number
+  medical?: number
+  misc?: number
+}) => {
+  const doc = await Expense.findOneAndUpdate(
+    { date: new Date(data.date) },
+    { $set: data },
+    { upsert: true, new: true, runValidators: true }
+  )
+  return doc
+}
 
-// ── Sales ─────────────────────────────────────────────────────────────────────
+export const getExpense = async (date: string) => {
+  return Expense.findOne({ date: new Date(date) })
+}
 
-export const getSales = async (
-  query: {
-    page?: number;
-    limit?: number;
-    from?: string;
-    to?: string;
-    paymentMode?: string;
-  } = {},
-) => {
-  const page  = Number(query.page  ?? 1);
-  const limit = Number(query.limit ?? 20);
-  const skip  = (page - 1) * limit;
+export const getExpenses = async (params: { from?: string; to?: string; month?: string }) => {
+  const filter: Record<string, unknown> = {}
 
-  const filter: Record<string, unknown> = {};
-  if (query.paymentMode) filter.paymentMode = query.paymentMode;
-  if (query.from || query.to) {
+  if (params.month) {
+    const [y, m] = params.month.split('-').map(Number)
+    filter.date = {
+      $gte: new Date(y, m - 1, 1),
+      $lte: new Date(y, m, 0, 23, 59, 59),
+    }
+  } else if (params.from || params.to) {
+    filter.date = {
+      ...(params.from ? { $gte: new Date(params.from) } : {}),
+      ...(params.to   ? { $lte: new Date(params.to)   } : {}),
+    }
+  }
+
+  return Expense.find(filter).sort({ date: -1 })
+}
+
+export const getMakingPrice = async (date?: string) => {
+  const day   = date ? new Date(date) : new Date()
+  const start = new Date(day.getFullYear(), day.getMonth(), day.getDate())
+  const end   = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 23, 59, 59)
+
+  const [expense, milkAgg] = await Promise.all([
+    Expense.findOne({ date: { $gte: start, $lte: end } }),
+    MilkEntry.aggregate([
+      { $match: { date: { $gte: start, $lte: end } } },
+      { $group: { _id: null, total: { $sum: '$quantityLiters' } } },
+    ]),
+  ])
+
+  const expenseTotal = expense
+    ? (expense.feed + expense.labor + expense.transport + expense.medical + expense.misc)
+    : 0
+  const milkTotal   = milkAgg[0]?.total ?? 0
+  const makingPrice = milkTotal > 0 ? +(expenseTotal / milkTotal).toFixed(2) : 0
+
+  return { date: start, expenseTotal, milkTotal, makingPrice }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PRODUCTS  (stock CRUD — already in product.service.ts pattern)
+// ═══════════════════════════════════════════════════════════════
+
+export const getProducts = async (activeOnly = true) =>
+  Product.find(activeOnly ? { isActive: true } : {}).sort({ name: 1 })
+
+export const getProductById = async (id: string) => {
+  const p = await Product.findById(id)
+  if (!p) throw new Error('Product not found')
+  return p
+}
+
+export const createProduct = async (data: {
+  name: string; unit: string; mrp: number
+  costPrice?: number; stockQty?: number; quickButtons?: number[]
+}) => {
+  const exists = await Product.findOne({ name: data.name.trim(), isActive: true })
+  if (exists) throw new Error(`Product "${data.name}" already exists`)
+  return Product.create(data)
+}
+
+export const updateProduct = async (id: string, data: Record<string, unknown>) => {
+  const p = await Product.findByIdAndUpdate(id, { $set: data }, { new: true, runValidators: true })
+  if (!p) throw new Error('Product not found')
+  return p
+}
+
+export const adjustStock = async (id: string, delta: number) => {
+  const p = await Product.findOneAndUpdate(
+    { _id: id, stockQty: { $gte: delta < 0 ? Math.abs(delta) : 0 } },
+    { $inc: { stockQty: delta } },
+    { new: true }
+  )
+  if (!p) throw new Error('Insufficient stock or product not found')
+  return p
+}
+
+export const setStock = async (id: string, qty: number) => {
+  const p = await Product.findByIdAndUpdate(id, { $set: { stockQty: qty } }, { new: true, runValidators: true })
+  if (!p) throw new Error('Product not found')
+  return p
+}
+
+export const deleteProduct = async (id: string) => {
+  const p = await Product.findByIdAndUpdate(id, { $set: { isActive: false } }, { new: true })
+  if (!p) throw new Error('Product not found')
+  return p
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RETAIL SALES (POS)
+// ═══════════════════════════════════════════════════════════════
+
+export const createSale = async (data: {
+  items: { productId: string; quantity: number; unitPrice: number }[]
+  paymentMode: 'CASH' | 'UPI'
+  customerName?: string
+}) => {
+  // Validate all stock upfront before touching anything
+  for (const item of data.items) {
+    const p = await Product.findById(item.productId)
+    if (!p || !p.isActive)             throw new Error(`Product not found: ${item.productId}`)
+    if (p.stockQty < item.quantity)    throw new Error(`Insufficient stock: ${p.name} (have ${p.stockQty} ${p.unit})`)
+  }
+
+  // Build line items + deduct stock atomically per product
+  let totalAmount = 0
+  const saleItems = []
+
+  for (const item of data.items) {
+    const p = await Product.findOneAndUpdate(
+      { _id: item.productId, stockQty: { $gte: item.quantity } },
+      { $inc: { stockQty: -item.quantity } },
+      { new: true }
+    )
+    if (!p) throw new Error(`Stock race condition on product ${item.productId}. Please retry.`)
+
+    const lineTotal = +(item.quantity * item.unitPrice).toFixed(2)
+    totalAmount += lineTotal
+    saleItems.push({
+      productId:   p._id,
+      productName: p.name,          // denormalized — survives product deletion
+      unit:        p.unit,
+      quantity:    item.quantity,
+      unitPrice:   item.unitPrice,
+      lineTotal,
+    })
+  }
+
+  return Sale.create({
+    items:        saleItems,
+    totalAmount:  +totalAmount.toFixed(2),
+    paymentMode:  data.paymentMode,
+    customerName: data.customerName,
+    dateTime:     new Date(),
+  })
+}
+
+export const getSales = async (params: {
+  from?: string; to?: string
+  paymentMode?: string
+  page?: number; limit?: number
+}) => {
+  const page  = Number(params.page  ?? 1)
+  const limit = Number(params.limit ?? 20)
+  const filter: Record<string, unknown> = {}
+
+  if (params.paymentMode)     filter.paymentMode = params.paymentMode
+  if (params.from || params.to) {
     filter.dateTime = {
-      ...(query.from ? { $gte: new Date(query.from) } : {}),
-      ...(query.to   ? { $lte: new Date(query.to)   } : {}),
-    };
+      ...(params.from ? { $gte: new Date(params.from) } : {}),
+      ...(params.to   ? { $lte: new Date(params.to)   } : {}),
+    }
   }
-  const [sales, total] = await Promise.all([
-    Sale.find(filter).sort({ dateTime: -1 }).skip(skip).limit(limit),
-    Sale.countDocuments(filter),
-  ]);
 
-  return { sales, total, page, pages: Math.ceil(total / limit) };
-};
+  const [sales, total] = await Promise.all([
+    Sale.find(filter).sort({ dateTime: -1 }).skip((page - 1) * limit).limit(limit),
+    Sale.countDocuments(filter),
+  ])
+
+  return { sales, total, page, pages: Math.ceil(total / limit) }
+}
 
 export const getSaleById = async (id: string) => {
-  return Sale.findById(id);
-};
+  const s = await Sale.findById(id)
+  if (!s) throw new Error('Sale not found')
+  return s
+}
 
-export const createPosSale = async (data: {
-  items: { batchId: string; quantity: number; unitPrice: number; discount?: number }[];
-  paymentMode: string;
-  customerName?: string;
-  customerId?: string;
+// ═══════════════════════════════════════════════════════════════
+// WHOLESALE SALES
+// ═══════════════════════════════════════════════════════════════
+
+export const createWholesaleSale = async (data: {
+  date: string
+  buyerName: string
+  quantityLiters: number
+  fat?: number
+  snf?: number
+  ratePerLiter: number
+  notes?: string
 }) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  const totalAmount = +(data.quantityLiters * data.ratePerLiter).toFixed(2)
+  return WholesaleSale.create({ ...data, date: new Date(data.date), totalAmount, paymentStatus: 'PENDING' })
+}
 
-  try {
-    let totalAmount = 0;
-    const saleItems = [];
-
-    for (const item of data.items) {
-      const batch = await Batch.findById(item.batchId).session(session);
-      if (!batch) throw new Error(`Batch ${item.batchId} not found`);
-      if (batch.stockRemaining < item.quantity) {
-        throw new Error(
-          `Insufficient stock for batch ${batch.batchId}: ` +
-          `requested ${item.quantity}, available ${batch.stockRemaining}`,
-        );
-      }
-
-      const discount = item.discount ?? 0;
-      const lineTotal = item.quantity * item.unitPrice * (1 - discount / 100);
-      totalAmount += lineTotal;
-
-      saleItems.push({
-        productId: batch.productType,
-        batchId:   batch._id,
-        quantity:  item.quantity,
-        unitPrice: item.unitPrice,
-        discount,
-        total:     lineTotal,
-      });
-
-      await Batch.findByIdAndUpdate(
-        item.batchId,
-        { $inc: { stockRemaining: -item.quantity } },
-        { session },
-      );
+export const getWholesaleSales = async (params: {
+  status?: string; from?: string; to?: string
+}) => {
+  const filter: Record<string, unknown> = {}
+  if (params.status)              filter.paymentStatus = params.status
+  if (params.from || params.to) {
+    filter.date = {
+      ...(params.from ? { $gte: new Date(params.from) } : {}),
+      ...(params.to   ? { $lte: new Date(params.to)   } : {}),
     }
-
-    const [sale] = await Sale.create(
-      [
-        {
-          items:        saleItems,
-          totalAmount,
-          paymentMode:  data.paymentMode,
-          customerName: data.customerName,
-          customerId:   data.customerId,
-          dateTime:     new Date(),
-        },
-      ],
-      { session },
-    );
-
-    await session.commitTransaction();
-    return sale;
-  } catch (err) {
-    await session.abortTransaction();
-    throw err;
-  } finally {
-    session.endSession();
   }
-};
+  return WholesaleSale.find(filter).sort({ date: -1 })
+}
 
-// ── Reports ───────────────────────────────────────────────────────────────────
+export const markWholesalePaymentReceived = async (id: string) => {
+  const ws = await WholesaleSale.findByIdAndUpdate(
+    id,
+    { $set: { paymentStatus: 'RECEIVED', paymentDate: new Date() } },
+    { new: true }
+  )
+  if (!ws) throw new Error('Wholesale sale not found')
+  return ws
+}
 
-export const getRevenueChart = async (
-  query: { period?: 'week' | 'month' | 'year' } = {},
-) => {
-  const period = query.period ?? 'month';
-  const now    = new Date();
+// ═══════════════════════════════════════════════════════════════
+// REPORTS
+// ═══════════════════════════════════════════════════════════════
 
-  const from =
-    period === 'week'  ? new Date(now.getTime() - 7  * 86_400_000) :
-    period === 'year'  ? new Date(now.getTime() - 365 * 86_400_000) :
-    new Date(now.getTime() - 30 * 86_400_000);
-
-  const fmt =
-    period === 'year' ? '%Y-%m' : '%Y-%m-%d';
-
-  return Sale.aggregate([
-    { $match: { dateTime: { $gte: from } } },
-    {
-      $group: {
-        _id:     { $dateToString: { format: fmt, date: '$dateTime' } },
-        revenue: { $sum: '$totalAmount' },
-        count:   { $sum: 1 },
-      },
-    },
-    { $sort: { _id: 1 } },
-    { $project: { date: '$_id', revenue: 1, count: 1, _id: 0 } },
-  ]);
-};
-
-export const getProductBreakdown = async (
-  query: { from?: string; to?: string } = {},
-) => {
-  const filter: Record<string, unknown> = {};
-  if (query.from || query.to) {
-    filter.dateTime = {
-      ...(query.from ? { $gte: new Date(query.from) } : {}),
-      ...(query.to   ? { $lte: new Date(query.to)   } : {}),
-    };
+const dayBounds = (date?: string) => {
+  const d = date ? new Date(date) : new Date()
+  return {
+    start: new Date(d.getFullYear(), d.getMonth(), d.getDate()),
+    end:   new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999),
   }
+}
 
-  return Sale.aggregate([
-    { $match: filter },
-    { $unwind: '$items' },
-    {
-      $group: {
-        _id:      '$items.productId',
-        revenue:  { $sum: '$items.total' },
-        quantity: { $sum: '$items.quantity' },
-        orders:   { $sum: 1 },
-      },
-    },
-    { $sort: { revenue: -1 } },
-    { $project: { product: '$_id', revenue: 1, quantity: 1, orders: 1, _id: 0 } },
-  ]);
-};
+export const getDailyReport = async (date?: string) => {
+  const { start, end } = dayBounds(date)
 
-export const getDailyReport = async (dateStr?: string) => {
-  const date = dateStr ? new Date(dateStr) : new Date();
-  const from = startOfDay(date);
-  const to   = endOfDay(date);
+  const [milkAgg, expense, salesAgg, salesByMode, wholesaleAgg, pendingAgg] = await Promise.all([
+    // Total milk collected today
+    MilkEntry.aggregate([
+      { $match: { date: { $gte: start, $lte: end } } },
+      { $group: { _id: null, total: { $sum: '$quantityLiters' }, entries: { $sum: 1 } } },
+    ]),
+    // Today's expenses
+    Expense.findOne({ date: { $gte: start, $lte: end } }),
+    // Retail sales totals
+    Sale.aggregate([
+      { $match: { dateTime: { $gte: start, $lte: end } } },
+      { $group: { _id: null, revenue: { $sum: '$totalAmount' }, count: { $sum: 1 } } },
+    ]),
+    // Breakdown by payment mode
+    Sale.aggregate([
+      { $match: { dateTime: { $gte: start, $lte: end } } },
+      { $group: { _id: '$paymentMode', total: { $sum: '$totalAmount' }, count: { $sum: 1 } } },
+    ]),
+    // Wholesale sold today
+    WholesaleSale.aggregate([
+      { $match: { date: { $gte: start, $lte: end } } },
+      { $group: { _id: null, liters: { $sum: '$quantityLiters' }, revenue: { $sum: '$totalAmount' } } },
+    ]),
+    // All-time pending wholesale payments
+    WholesaleSale.aggregate([
+      { $match: { paymentStatus: 'PENDING' } },
+      { $group: { _id: null, total: { $sum: '$totalAmount' }, count: { $sum: 1 } } },
+    ]),
+  ])
 
-  const [sales, batchesMade] = await Promise.all([
-    Sale.find({ dateTime: { $gte: from, $lte: to } }),
-    Batch.find({ productionDate: { $gte: from, $lte: to } }),
-  ]);
-
-  const totalRevenue    = sales.reduce((s, r) => s + r.totalAmount, 0);
-  const totalTransactions = sales.length;
-  const byPaymentMode   = sales.reduce<Record<string, number>>((acc, s) => {
-    acc[s.paymentMode] = (acc[s.paymentMode] ?? 0) + s.totalAmount;
-    return acc;
-  }, {});
+  const milkCollected  = milkAgg[0]?.total    ?? 0
+  const expenseTotal   = expense
+    ? expense.feed + expense.labor + expense.transport + expense.medical + expense.misc
+    : 0
+  const retailRevenue  = salesAgg[0]?.revenue  ?? 0
+  const retailCount    = salesAgg[0]?.count    ?? 0
+  const wholesaleRevenue = wholesaleAgg[0]?.revenue ?? 0
+  const makingPrice    = milkCollected > 0 ? +(expenseTotal / milkCollected).toFixed(2) : 0
 
   return {
-    date: from,
-    totalRevenue,
-    totalTransactions,
-    byPaymentMode,
-    batchesProduced: batchesMade.length,
-    sales,
-  };
-};
+    date:    start,
+    milk: {
+      collected:   milkCollected,
+      entries:     milkAgg[0]?.entries ?? 0,
+      wholesaled:  wholesaleAgg[0]?.liters ?? 0,
+      available:   Math.max(0, milkCollected - (wholesaleAgg[0]?.liters ?? 0)),
+    },
+    expenses:       { ...expense?.toObject(), total: expenseTotal },
+    makingPrice,
+    retail: {
+      revenue:      retailRevenue,
+      transactions: retailCount,
+      byMode:       Object.fromEntries(salesByMode.map((r) => [r._id, { total: r.total, count: r.count }])),
+    },
+    wholesale: {
+      revenue:      wholesaleRevenue,
+      liters:       wholesaleAgg[0]?.liters ?? 0,
+    },
+    totalRevenue:   +(retailRevenue + wholesaleRevenue).toFixed(2),
+    pendingPayments: {
+      total:  pendingAgg[0]?.total ?? 0,
+      count:  pendingAgg[0]?.count ?? 0,
+    },
+  }
+}
+
+export const getMonthlyReport = async (month: string) => {
+  const [y, m] = month.split('-').map(Number)
+  const start  = new Date(y, m - 1, 1)
+  const end    = new Date(y, m, 0, 23, 59, 59, 999)
+
+  const [milkAgg, expenseAgg, salesAgg, wholesaleAgg] = await Promise.all([
+    MilkEntry.aggregate([
+      { $match: { date: { $gte: start, $lte: end } } },
+      { $group: { _id: null, total: { $sum: '$quantityLiters' } } },
+    ]),
+    Expense.aggregate([
+      { $match: { date: { $gte: start, $lte: end } } },
+      {
+        $group: {
+          _id: null,
+          feed: { $sum: '$feed' }, labor: { $sum: '$labor' },
+          transport: { $sum: '$transport' }, medical: { $sum: '$medical' }, misc: { $sum: '$misc' },
+        },
+      },
+    ]),
+    Sale.aggregate([
+      { $match: { dateTime: { $gte: start, $lte: end } } },
+      { $group: { _id: null, revenue: { $sum: '$totalAmount' }, count: { $sum: 1 } } },
+    ]),
+    WholesaleSale.aggregate([
+      { $match: { date: { $gte: start, $lte: end } } },
+      { $group: { _id: null, liters: { $sum: '$quantityLiters' }, revenue: { $sum: '$totalAmount' } } },
+    ]),
+  ])
+
+  const expTotal = expenseAgg[0]
+    ? expenseAgg[0].feed + expenseAgg[0].labor + expenseAgg[0].transport
+      + expenseAgg[0].medical + expenseAgg[0].misc
+    : 0
+  const milkTotal = milkAgg[0]?.total ?? 0
+
+  return {
+    month: `${y}-${String(m).padStart(2, '0')}`,
+    milk:         { total: milkTotal },
+    expenses:     { ...expenseAgg[0], total: expTotal },
+    makingPrice:  milkTotal > 0 ? +(expTotal / milkTotal).toFixed(2) : 0,
+    retail:       { revenue: salesAgg[0]?.revenue ?? 0, transactions: salesAgg[0]?.count ?? 0 },
+    wholesale:    { revenue: wholesaleAgg[0]?.revenue ?? 0, liters: wholesaleAgg[0]?.liters ?? 0 },
+    totalRevenue: +((salesAgg[0]?.revenue ?? 0) + (wholesaleAgg[0]?.revenue ?? 0)).toFixed(2),
+  }
+}

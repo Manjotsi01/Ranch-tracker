@@ -1,51 +1,36 @@
-// src/hooks/useSales.ts
-import { useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { shopApi } from '../lib/api'
-import { useShopStore } from '../store/index'
-import type { CreateSalePayload } from '../types'
+import type { Sale, CreateSalePayload } from '../types'
 
 export function useSales() {
-  const {
-    sales, loading, error,
-    setSales, setLoading, setError, addSale,
-  } = useShopStore()
+  const [sales,   setSales]   = useState<Sale[]>([])
+  const [total,   setTotal]   = useState(0)
+  const [loading, setLoading] = useState(false)
+  const [error,   setError]   = useState<string | null>(null)
 
-  const fetchSales = useCallback(
-    async (params?: { page?: number; limit?: number; from?: string; to?: string; paymentMode?: string }) => {
-      setLoading(true)
-      setError(null)
-      try {
-        const res = await shopApi.getSales(params)
-        setSales(res.data.data ?? res.data)
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : 'Failed to load sales'
-        setError(msg)
-      } finally {
-        setLoading(false)
-      }
-    },
-    [setSales, setLoading, setError]
-  )
+  const fetchSales = useCallback(async (params?: Record<string, string | number>) => {
+    setLoading(true); setError(null)
+    try {
+      const res     = await shopApi.getSales(params)
+      const payload = res.data.data ?? res.data
+      if (Array.isArray(payload)) { setSales(payload); setTotal(payload.length) }
+      else { setSales(payload.sales ?? []); setTotal(payload.total ?? 0) }
+    } catch { setError('Failed to load sales') }
+    finally  { setLoading(false) }
+  }, [])
 
-  const createSale = useCallback(
-    async (payload: CreateSalePayload) => {
-      setLoading(true)
-      setError(null)
-      try {
-        const res = await shopApi.createSale(payload)
-        const sale = res.data.data ?? res.data
-        addSale(sale)
-        return sale
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : 'Failed to create sale'
-        setError(msg)
-        throw e
-      } finally {
-        setLoading(false)
-      }
-    },
-    [addSale, setLoading, setError]
-  )
+  const createSale = useCallback(async (payload: CreateSalePayload) => {
+    setLoading(true); setError(null)
+    try {
+      const res  = await shopApi.createSale(payload)
+      const sale = res.data.data ?? res.data
+      setSales((prev) => [sale, ...prev])
+      return sale as Sale
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Sale failed'
+      setError(msg); throw e
+    } finally { setLoading(false) }
+  }, [])
 
-  return { sales, loading, error, fetchSales, createSale }
+  return { sales, total, loading, error, fetchSales, createSale }
 }

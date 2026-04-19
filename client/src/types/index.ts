@@ -422,133 +422,139 @@ export interface HerdSummary {
 }
 
 // ─── Shop / POS ───────────────────────────────────────────────────────────────
-export type PaymentMode = 'CASH' | 'UPI' | 'CARD' | 'CREDIT';
-export type BatchStatus = 'PROCESSING' | 'READY' | 'EXPIRED';
-export type ProductType =
-  | 'PANEER' | 'GHEE' | 'DAHI' | 'BUTTER' | 'MAKKAN' | 'KHOYA'
-  | 'CREAM' | 'LASSI' | 'KULFI' | 'KHEER' | 'ICE_CREAM'
-  | 'HOT_MILK' | 'BAKERY' | 'CHAAT' | 'RESTAURANT';
+// ── Primitives ────────────────────────────────────────────────────────────────
+export type Shift       = 'MORNING' | 'EVENING'
+export type MilkSource  = 'OWN' | 'PURCHASED'
+export type PaymentMode = 'CASH' | 'UPI'
+export type WholesalePaymentStatus = 'PENDING' | 'RECEIVED'
 
-export interface BatchInput {
-  milkLiters: number;
-  milkSource: 'INTERNAL' | 'EXTERNAL';
-  avgFat: number;
-  avgSNF: number;
-  milkCost: number;
+// ── Milk ──────────────────────────────────────────────────────────────────────
+export interface MilkEntry {
+  _id: string
+  date: string
+  shift: Shift
+  quantityLiters: number
+  fat: number
+  snf: number
+  source: MilkSource
+  notes?: string
+  createdAt: string
 }
 
-export interface BatchCosts {
-  labor: number;
-  fuel: number;
-  ingredients: number;
-  packaging: number;
-  utilities: number;
+export interface MilkStock {
+  date: string
+  collected: number
+  wholesaled: number
+  available: number
 }
 
-export interface BatchOutput {
-  quantityProduced: number;
-  wastage: number;
+// ── Expense ───────────────────────────────────────────────────────────────────
+export interface Expense {
+  _id: string
+  date: string
+  feed: number
+  labor: number
+  transport: number
+  medical: number
+  misc: number
+  createdAt: string
 }
 
-export interface BatchPricing {
-  costPerUnit: number;
-  sellingPricePerUnit: number;
+export interface MakingPrice {
+  date: string
+  expenseTotal: number
+  milkTotal: number
+  makingPrice: number
 }
 
-export interface Batch {
-  _id: string;
-  batchId: string;
-  productType: ProductType;
-  productionDate: string;
-  expiryDate: string;
-  input: BatchInput;
-  costs: BatchCosts;
-  output: BatchOutput;
-  pricing: BatchPricing;
-  stockRemaining: number;
-  qualityScore: number;
-  status: BatchStatus;
-  createdAt: string;
-  updatedAt: string;
+// ── Product ───────────────────────────────────────────────────────────────────
+export interface Product {
+  _id: string
+  name: string
+  unit: string
+  mrp: number
+  costPrice: number
+  stockQty: number
+  isActive: boolean
+  quickButtons: number[]
+  createdAt: string
 }
 
-export interface CreateBatchPayload {
-  productType: ProductType;
-  productionDate: string;
-  expiryDate: string;
-  input: BatchInput;
-  costs: BatchCosts;
-  output: BatchOutput;
-  pricing: BatchPricing;
-  qualityScore?: number;
-}
-
+// ── Sale (Retail) ─────────────────────────────────────────────────────────────
 export interface SaleItem {
-  productId: string;
-  batchId: string;
-  quantity: number;
-  unitPrice: number;
-  discount: number;
-  total: number;
+  productId: string
+  productName: string
+  unit: string
+  quantity: number
+  unitPrice: number
+  lineTotal: number
 }
 
 export interface Sale {
-  _id: string;
-  saleId: string;
-  dateTime: string;
-  customerId?: string;
-  customerName?: string;
-  items: SaleItem[];
-  paymentMode: PaymentMode;
-  totalAmount: number;
-  createdBy: string;
-  createdAt: string;
+  _id: string
+  dateTime: string
+  items: SaleItem[]
+  paymentMode: PaymentMode
+  totalAmount: number
+  customerName?: string
+  createdAt: string
 }
 
 export interface CreateSalePayload {
-  customerId?: string;
-  customerName?: string;
-  items: Omit<SaleItem, 'total'>[];
-  paymentMode: PaymentMode;
+  items: { productId: string; quantity: number; unitPrice: number }[]
+  paymentMode: PaymentMode
+  customerName?: string
 }
 
-export interface Product {
-  _id: string;
-  productType: ProductType;
-  name: string;
-  unit: string;
-  currentStock: number;
-  batches: Batch[];
+// ── Wholesale ─────────────────────────────────────────────────────────────────
+export interface WholesaleSale {
+  _id: string
+  date: string
+  buyerName: string
+  quantityLiters: number
+  fat: number
+  snf: number
+  ratePerLiter: number
+  totalAmount: number
+  paymentStatus: WholesalePaymentStatus
+  paymentDate?: string
+  notes?: string
+  createdAt: string
 }
 
-export interface ShopStats {
-  todaySales: number;
-  todayRevenue: number;
-  weekRevenue: number;
-  monthRevenue: number;
-  activeBatches: number;
-  lowStockAlerts: number;
-  topProduct: string;
-  avgOrderValue: number;
+// ── Reports ───────────────────────────────────────────────────────────────────
+export interface DailyReport {
+  date: string
+  milk: { collected: number; entries: number; wholesaled: number; available: number }
+  expenses: Expense & { total: number }
+  makingPrice: number
+  retail: {
+    revenue: number
+    transactions: number
+    byMode: Record<string, { total: number; count: number }>
+  }
+  wholesale: { revenue: number; liters: number }
+  totalRevenue: number
+  pendingPayments: { total: number; count: number }
 }
 
-export interface RevenueDataPoint {
-  date: string;
-  revenue: number;
-  orders: number;
+export interface MonthlyReport {
+  month: string
+  milk: { total: number }
+  expenses: { feed: number; labor: number; transport: number; medical: number; misc: number; total: number }
+  makingPrice: number
+  retail: { revenue: number; transactions: number }
+  wholesale: { revenue: number; liters: number }
+  totalRevenue: number
 }
 
-export interface ProductSaleBreakdown {
-  productType: string;
-  totalSold: number;
-  totalRevenue: number;
-  margin: number;
-}
-
-export interface NavItem {
-  label: string;
-  path: string;
-  icon: string;
-  stage: number;
-  children?: NavItem[];
+// ── Cart (POS local state) ────────────────────────────────────────────────────
+export interface CartItem {
+  id: string
+  productId: string
+  productName: string
+  unit: string
+  unitPrice: number
+  quantity: number
+  lineTotal: number
 }

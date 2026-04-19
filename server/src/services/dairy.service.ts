@@ -10,13 +10,71 @@ import { env } from '../config/env';
 // ── Herd ──────────────────────────────────────────────────────────────────────
 
 export const getHerdSummary = async () => {
-  const [total, byStatus, byType] = await Promise.all([
+  const now = new Date()
+
+  const todayStart = new Date(now)
+  todayStart.setHours(0, 0, 0, 0)
+
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+
+  const [
+    totalAnimals,
+    statusAgg,
+    typeAgg,
+    todayMilkAgg,
+    monthlyMilkAgg,
+  ] = await Promise.all([
     Animal.countDocuments(),
-    Animal.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
-    Animal.aggregate([{ $group: { _id: '$type',   count: { $sum: 1 } } }]),
-  ]);
-  return { total, byStatus, byType };
-};
+
+    Animal.aggregate([
+      { $group: { _id: '$status', count: { $sum: 1 } } }
+    ]),
+
+    Animal.aggregate([
+      { $group: { _id: '$type', count: { $sum: 1 } } }
+    ]),
+
+    MilkRecord.aggregate([
+      { $match: { date: { $gte: todayStart } } },
+      { $group: { _id: null, total: { $sum: '$quantity' } } }
+    ]),
+
+    MilkRecord.aggregate([
+      { $match: { date: { $gte: monthStart } } },
+      { $group: { _id: null, total: { $sum: '$quantity' } } }
+    ]),
+  ])
+
+  // ✅ transform arrays → object
+  const byStatus: Record<string, number> = {}
+  for (const s of statusAgg) {
+    byStatus[s._id] = s.count
+  }
+
+  const byType: Record<string, number> = {}
+  for (const t of typeAgg) {
+    byType[t._id] = t.count
+  }
+
+  const milkingCount = byStatus['MILKING'] ?? 0
+  const todayMilk    = todayMilkAgg[0]?.total ?? 0
+  const monthlyMilk  = monthlyMilkAgg[0]?.total ?? 0
+
+  const avgMilkPerAnimal =
+    milkingCount > 0
+      ? parseFloat((todayMilk / milkingCount).toFixed(2))
+      : 0
+
+  return {
+    totalAnimals,
+    byStatus,
+    byType,
+    milkingCount,
+    todayMilk,
+    monthlyMilk,
+    avgMilkPerAnimal,
+  }
+}
 
 // ── Animals ───────────────────────────────────────────────────────────────────
 
@@ -148,7 +206,7 @@ export const getReproduction = async (animalId: string) => {
   const records = await ReproductionRecord
     .find({ animalId })
     .sort({ date: -1 })
-    
+
 const aiRecords      = records.filter(r => r.type === 'AI')
 const calvingRecords = records.filter(r => r.type === 'Calving')
 
