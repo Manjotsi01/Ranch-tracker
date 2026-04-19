@@ -103,15 +103,13 @@ export const VEGETABLE_GROUPS = {
 };
 
 export const EXPENSE_CATEGORIES = [
-  { value: 'Machinery', label: 'Land Preparation' },
-  { value: 'Seed', label: 'Seeds & Saplings' },
-  { value: 'Fertilizer', label: 'Fertilizer' },
-  { value: 'Irrigation', label: 'Irrigation' },
-  { value: 'Labour', label: 'Labour' },
-  { value: 'Pest Control', label: 'Pest Control' },
-  { value: 'Machinery', label: 'Harvesting' },
-  { value: 'Machinery', label: 'Transport' },
-  { value: 'Other', label: 'Other' },
+  { value: 'SEEDS',      label: 'Seeds & Saplings' },
+  { value: 'FERTILIZER', label: 'Fertilizer' },
+  { value: 'PESTICIDE',  label: 'Pest Control' },
+  { value: 'LABOUR',     label: 'Labour' },
+  { value: 'MACHINERY',  label: 'Machinery / Land Prep' },
+  { value: 'IRRIGATION', label: 'Irrigation' },
+  { value: 'OTHER',      label: 'Other' },
 ];
 
 export const SEASON_STATUSES: { value: string; label: string; color: string }[] = [

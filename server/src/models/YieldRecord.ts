@@ -23,8 +23,8 @@ const yieldRecordSchema = new mongoose.Schema({
   toObject:{ virtuals: true },
 });
 
-yieldRecordSchema.virtual('yieldId').get(function () {
-  return this._id.toString();
+yieldRecordSchema.virtual('revenue').get(function () {
+  return this.revenueRealized;
 });
 
 yieldRecordSchema.index({ date: -1 });

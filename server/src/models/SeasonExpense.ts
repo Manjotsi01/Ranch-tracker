@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { EXPENSE_CATEGORY_VALUES } from '../constants/expense';
 
 const seasonExpenseSchema = new mongoose.Schema({
   seasonId: {
@@ -11,11 +12,12 @@ const seasonExpenseSchema = new mongoose.Schema({
     },
   },
   date:        { type: Date, required: true, default: Date.now },
-  category:    {
-    type: String,
-    enum: ['SEEDS', 'FERTILIZER', 'PESTICIDE', 'LABOUR', 'MACHINERY', 'IRRIGATION', 'OTHER'],
-    required: true,
-  },
+  category: {
+  type: String,
+  enum: EXPENSE_CATEGORY_VALUES,
+  required: true,
+},
+
   description: { type: String, trim: true },
   amount:      { type: Number, required: true, min: 0 },
   vendor:      { type: String, trim: true },

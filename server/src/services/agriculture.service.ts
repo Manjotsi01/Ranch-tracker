@@ -96,8 +96,16 @@ export const deleteSeason = async (id: string) => {
 
 // ─── Expenses ─────────────────────────────────────────────────────────────────
 
-export const getExpenses = async (seasonId: string) =>
-  SeasonExpense.find({ seasonId }).sort({ date: -1 });
+export const getExpenses = async (seasonId: string) => {
+  if (!seasonId || !/^[a-f\d]{24}$/i.test(seasonId)) {
+    throw new Error('Invalid seasonId');
+  }
+
+  return SeasonExpense
+    .find({ seasonId })
+    .sort({ date: -1 })
+    .lean();   // ✅ prevents serialization crashes
+};
 
 export const addExpenseToSeason = async (seasonId: string, data: Record<string, unknown>) => {
   await getSeasonById(seasonId);

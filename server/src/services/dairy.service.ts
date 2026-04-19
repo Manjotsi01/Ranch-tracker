@@ -60,22 +60,43 @@ export const getMilkRecords = async (
   return MilkRecord.find(filter).sort({ date: -1 });
 };
 
-export const getMilkSummary = async (
-  animalId: string,
-  query: Record<string, string> = {},
-) => {
-  const from = query.from ? new Date(query.from) : new Date(Date.now() - 30 * 86_400_000);
-  const to   = query.to   ? new Date(query.to)   : new Date();
+export const getMilkSummary = async (animalId: string, query: any = {}) => {
+  const from = query.from ? new Date(query.from) : new Date(Date.now() - 30 * 86400000)
+  const to   = query.to   ? new Date(query.to)   : new Date()
 
   const records = await MilkRecord.find({
     animalId,
-    date: { $gte: from, $lte: to },
-  });
+    date: { $gte: from, $lte: to }
+  })
 
-  const totalLitres  = records.reduce((s, r) => s + (r.quantity ?? r.total ?? 0), 0);
-  const totalRevenue = totalLitres * env.MILK_PRICE_PER_LITRE;
-  return { totalLitres, totalRevenue, recordCount: records.length, from, to };
-};
+  const dailyMap = new Map<string, {
+    date: string
+    morning: number
+    evening: number
+    total: number
+  }>()
+
+  for (const r of records) {
+    const key = new Date(r.date).toISOString().slice(0, 10)
+
+    const existing = dailyMap.get(key) ?? {
+      date: key,
+      morning: 0,
+      evening: 0,
+      total: 0
+    }
+
+    if (r.session === 'MORNING') existing.morning += r.quantity ?? 0
+    if (r.session === 'EVENING') existing.evening += r.quantity ?? 0
+
+    existing.total = existing.morning + existing.evening
+
+    dailyMap.set(key, existing)
+  }
+
+  return Array.from(dailyMap.values())
+    .sort((a, b) => a.date.localeCompare(b.date))
+}
 
 export const createMilkRecord = async (animalId: string, data: unknown) => {
   return MilkRecord.create({ ...(data as object), animalId });
@@ -124,8 +145,32 @@ export const updateLactation = async (
 // ── Reproduction ──────────────────────────────────────────────────────────────
 
 export const getReproduction = async (animalId: string) => {
-  return ReproductionRecord.find({ animalId }).sort({ date: -1 });
-};
+  const records = await ReproductionRecord
+    .find({ animalId })
+    .sort({ date: -1 })
+    
+const aiRecords      = records.filter(r => r.type === 'AI')
+const calvingRecords = records.filter(r => r.type === 'Calving')
+
+  const lastAI      = aiRecords[0]
+  const lastCalving = calvingRecords[0]
+
+  return {
+    animalId,
+    currentPregnancyStatus:
+      lastAI?.status === 'PREGNANT' ? 'PREGNANT' : 'UNKNOWN',
+
+    expectedDueDate: undefined,
+    totalCalvings: calvingRecords.length,
+    lastCalvingDate: lastCalving?.date,
+
+    totalAIAttempts: aiRecords.length,
+    lastAIDate: lastAI?.date,
+
+    aiRecords,
+    calvingRecords,
+  }
+}
 
 export const createAIRecord = async (animalId: string, data: unknown) => {
   return ReproductionRecord.create({ ...(data as object), animalId, type: 'AI' });
@@ -152,8 +197,33 @@ export const createCalving = async (animalId: string, data: unknown) => {
 // ── Health ────────────────────────────────────────────────────────────────────
 
 export const getHealth = async (animalId: string) => {
-  return HealthRecord.find({ animalId }).sort({ date: -1 });
-};
+  const records = await HealthRecord
+    .find({ animalId })
+    .sort({ date: -1 })
+
+  const vaccinations = records.filter(r => r.recordType === 'VACCINATION')
+  const treatments   = records.filter(r => r.recordType === 'TREATMENT')
+
+  return {
+    animalId,
+    vaccinations,
+    treatments,
+
+    totalVaccinationCost: vaccinations.reduce(
+      (s, r) => s + (r.cost ?? 0), 0
+    ),
+
+    totalTreatmentCost: treatments.reduce(
+      (s, r) => s + (r.cost ?? 0), 0
+    ),
+
+    upcomingVaccinations: vaccinations.filter(
+      v => v.vaccineStatus === 'DUE'
+    ),
+
+    recentTreatments: treatments.slice(0, 5),
+  }
+}
 
 export const createVaccination = async (animalId: string, data: unknown) => {
   return HealthRecord.create({
@@ -202,12 +272,34 @@ export const updateTreatment = async (
 // ── Feeding ───────────────────────────────────────────────────────────────────
 
 export const getFeeding = async (animalId: string) => {
-  const [records, animal] = await Promise.all([
-    FeedRecord.find({ animalId }).sort({ date: -1 }).limit(90),
+  const [feedRecords, animal] = await Promise.all([
+    FeedRecord.find({ animalId })
+      .sort({ date: -1 })
+      .limit(90),
+
     Animal.findById(animalId).select('feedingPlan'),
-  ]);
-  return { records, plan: animal?.feedingPlan ?? [] };
-};
+  ])
+
+  const plan = animal?.feedingPlan ?? []
+
+  const dailyFeedCost = plan.reduce(
+    (s: number, p: any) =>
+      s + p.dailyQuantity * (p.costPerUnit ?? 0),
+    0
+  )
+
+  return {
+    animalId,
+    currentPlan: plan,   // ✅ FIXED KEY
+    feedRecords,
+
+    dailyFeedCost,
+    monthlyFeedCost: dailyFeedCost * 30,
+    yearlyFeedCost:  dailyFeedCost * 365,
+
+    dailyBreakdown: [],
+  }
+}
 
 export const createFeedRecord = async (animalId: string, data: unknown) => {
   return FeedRecord.create({ ...(data as object), animalId });
@@ -245,16 +337,22 @@ export const getProfitability = async (
   const healthCost    = healthRecords.reduce((s, r) => s + (r.cost ?? 0), 0);
   const totalCost     = feedCost + healthCost;
   const netProfit     = milkRevenue - totalCost;
+return {
+  animalId,
+  period: query.period ?? 'custom',
 
-  return {
-    animal,
-    period: { from, to },
-    revenue:  { milk: milkRevenue, total: milkRevenue },
-    costs:    { feed: feedCost, health: healthCost, total: totalCost },
-    milk:     { litres: totalMilk, records: milkRecords.length },
-    netProfit,
-    roi: totalCost > 0 ? ((netProfit / totalCost) * 100).toFixed(2) + '%' : 'N/A',
-  };
+  milkIncome: milkRevenue,
+  feedCost,
+  medicalCost: healthCost,
+  otherCost: 0,
+
+  netProfit,
+
+  roi:
+    totalCost > 0
+      ? parseFloat(((netProfit / totalCost) * 100).toFixed(2))
+      : 0,
+}
 };
 
 // ── Fodder ────────────────────────────────────────────────────────────────────
