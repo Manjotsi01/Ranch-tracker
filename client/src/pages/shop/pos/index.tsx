@@ -1,3 +1,4 @@
+// client/src/pages/shop/pos/index.tsx
 import React, { useEffect, useCallback, useState } from 'react'
 import {
   ShoppingCart, Trash2, Plus, Minus, X, CheckCircle,
@@ -8,7 +9,21 @@ import { useSales }    from '../../../hooks/useSales'
 import { useCartStore } from '../../../store/cartStore'
 import type { Product } from '../../../types'
 
-const fmt = (n: number) => `₹${n.toLocaleString('en-IN', { minimumFractionDigits: 0 })}`
+const fmt = (n: number) => `₹${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 0 })}`
+
+// Category display config
+const CATEGORIES: { key: string; label: string; emoji: string }[] = [
+  { key: 'ALL',       label: 'All',        emoji: '🏪' },
+  { key: 'MILK',      label: 'Milk',       emoji: '🥛' },
+  { key: 'CURD',      label: 'Curd',       emoji: '🍶' },
+  { key: 'PANEER',    label: 'Paneer',     emoji: '🧀' },
+  { key: 'GHEE',      label: 'Ghee',       emoji: '🫙' },
+  { key: 'BUTTER',    label: 'Butter',     emoji: '🧈' },
+  { key: 'LASSI',     label: 'Lassi',      emoji: '🥤' },
+  { key: 'KHOYA',     label: 'Khoya',      emoji: '🍯' },
+  { key: 'CREAM',     label: 'Cream',      emoji: '🍦' },
+  { key: 'OTHER',     label: 'Other',      emoji: '📦' },
+]
 
 const stockStatus = (p: Product) => {
   if (p.stockQty <= 0) return 'OUT'
@@ -18,13 +33,14 @@ const stockStatus = (p: Product) => {
 
 const POS: React.FC = () => {
   const { products, loading, fetchProducts } = useProducts()
-  const { createSale }                       = useSales()
-  const cart                                 = useCartStore()
+  const { createSale }                        = useSales()
+  const cart                                  = useCartStore()
 
-  const [search,       setSearch]      = useState('')
-  const [submitting,   setSubmitting]  = useState(false)
-  const [saleError,    setSaleError]   = useState<string | null>(null)
-  const [successTotal, setSuccessTotal] = useState<number | null>(null)
+  const [search,        setSearch]       = useState('')
+  const [activeCategory, setActiveCategory] = useState('ALL')
+  const [submitting,    setSubmitting]   = useState(false)
+  const [saleError,     setSaleError]    = useState<string | null>(null)
+  const [successTotal,  setSuccessTotal] = useState<number | null>(null)
 
   useEffect(() => { fetchProducts() }, [fetchProducts])
 
@@ -52,12 +68,20 @@ const POS: React.FC = () => {
     } finally { setSubmitting(false) }
   }
 
-  const filtered = products.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase())
-  )
+  // Filter by category AND search
+  const filtered = products.filter(p => {
+    const matchCat    = activeCategory === 'ALL' || p.category === activeCategory
+    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase())
+    return matchCat && matchSearch
+  })
 
   const cartTotal = cart.total()
   const cartCount = cart.itemCount()
+
+  // Categories that actually have products
+  const activeCats = CATEGORIES.filter(c =>
+    c.key === 'ALL' || products.some(p => p.category === c.key)
+  )
 
   return (
     <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-slate-50">
@@ -77,6 +101,30 @@ const POS: React.FC = () => {
           </div>
         </div>
 
+        {/* Category tabs */}
+        <div className="px-3 py-2 border-b border-slate-100 bg-white overflow-x-auto flex gap-1.5">
+          {activeCats.map(c => (
+            <button
+              key={c.key}
+              onClick={() => setActiveCategory(c.key)}
+              className={[
+                'flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-semibold whitespace-nowrap transition-all shrink-0',
+                activeCategory === c.key
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+              ].join(' ')}
+            >
+              <span className="text-[14px]">{c.emoji}</span>
+              {c.label}
+              {c.key !== 'ALL' && (
+                <span className={`text-[10px] rounded-full px-1.5 py-0.5 font-bold ${activeCategory === c.key ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                  {products.filter(p => p.category === c.key && p.stockQty > 0).length}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
         {/* Product grid */}
         <div className="flex-1 overflow-y-auto p-4">
           {loading ? (
@@ -88,7 +136,9 @@ const POS: React.FC = () => {
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-48 text-slate-400">
               <ShoppingCart size={36} className="mb-3 opacity-40" />
-              <p className="text-sm font-medium">{search ? 'No products match your search' : 'No products yet'}</p>
+              <p className="text-sm font-medium">
+                {search ? 'No products match your search' : `No ${activeCategory === 'ALL' ? '' : activeCategory} products yet`}
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -108,16 +158,13 @@ const POS: React.FC = () => {
             <ShoppingCart size={16} className="text-slate-700" />
             <span className="font-bold text-slate-900 text-sm">Cart</span>
             {cartCount > 0 && (
-              <span className="bg-red-500 text-white text-xs rounded-full px-2 py-0.5 font-bold leading-none">
+              <span className="bg-blue-600 text-white text-xs rounded-full px-2 py-0.5 font-bold leading-none">
                 {cartCount}
               </span>
             )}
           </div>
           {cart.items.length > 0 && (
-            <button
-              onClick={cart.clearCart}
-              className="flex items-center gap-1 text-xs text-slate-400 hover:text-red-500 transition-colors"
-            >
+            <button onClick={cart.clearCart} className="flex items-center gap-1 text-xs text-slate-400 hover:text-red-500 transition-colors">
               <X size={11} /> Clear
             </button>
           )}
@@ -133,7 +180,7 @@ const POS: React.FC = () => {
           />
         </div>
 
-        {/* Items */}
+        {/* Cart items */}
         <div className="flex-1 overflow-y-auto">
           {cart.items.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-36 text-slate-300">
@@ -179,7 +226,6 @@ const POS: React.FC = () => {
 
         {/* Payment + checkout */}
         <div className="border-t border-slate-100 p-4 space-y-3 bg-slate-50">
-          {/* Payment mode */}
           <div className="grid grid-cols-2 gap-2">
             {(['CASH', 'UPI'] as const).map(mode => (
               <button
@@ -192,37 +238,31 @@ const POS: React.FC = () => {
                     : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300',
                 ].join(' ')}
               >
-                {mode === 'CASH' ? <Banknote size={14} /> : <Smartphone size={14} />}
-                {mode}
+                {mode === 'CASH' ? <Banknote size={14} /> : <Smartphone size={14} />} {mode}
               </button>
             ))}
           </div>
 
-          {/* Total */}
           <div className="flex justify-between items-center">
             <span className="text-base font-bold text-slate-800">Total</span>
             <span className="text-xl font-bold text-blue-600">{fmt(cartTotal)}</span>
           </div>
 
-          {/* Error */}
           {saleError && (
             <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">
-              <AlertTriangle size={13} className="shrink-0" />
-              {saleError}
+              <AlertTriangle size={13} className="shrink-0" /> {saleError}
             </div>
           )}
 
-          {/* Checkout button */}
           <button
             onClick={handleCheckout}
             disabled={cart.items.length === 0 || submitting}
             className="w-full h-12 rounded-xl bg-blue-600 text-white font-bold text-base hover:bg-blue-700 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
           >
-            {submitting ? (
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <>Confirm Sale · {fmt(cartTotal)}</>
-            )}
+            {submitting
+              ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              : <>Confirm Sale · {fmt(cartTotal)}</>
+            }
           </button>
         </div>
       </div>
@@ -235,7 +275,7 @@ const POS: React.FC = () => {
               <CheckCircle size={32} className="text-emerald-600" />
             </div>
             <p className="text-3xl font-bold text-slate-900 mb-1">{fmt(successTotal)}</p>
-            <p className="text-sm text-slate-500 mb-6">Paid via {cart.paymentMode} · Stock updated</p>
+            <p className="text-sm text-slate-500 mb-6">Sale recorded · Stock updated</p>
             <button
               onClick={() => setSuccessTotal(null)}
               className="w-full h-11 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors"
@@ -257,38 +297,26 @@ const ProductCard: React.FC<{ product: Product; onAdd: (p: Product, qty: number)
   return (
     <div className={[
       'bg-white border rounded-2xl p-4 flex flex-col transition-all duration-200',
-      oos ? 'opacity-60 border-slate-100' : low ? 'border-amber-200 hover:border-amber-300 hover:shadow-md' : 'border-slate-100 hover:border-blue-300 hover:shadow-md',
+      oos ? 'opacity-50 border-slate-100' : low ? 'border-amber-200 hover:border-amber-300 hover:shadow-md' : 'border-slate-100 hover:border-blue-300 hover:shadow-md',
     ].join(' ')}>
       <p className="font-bold text-slate-900 text-sm leading-tight mb-1">{product.name}</p>
 
-      {/* Stock badge */}
       {oos ? (
-        <span className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-full w-fit mb-1">
-          ✗ Out of stock
-        </span>
+        <span className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-full w-fit mb-1">✗ Out of stock</span>
       ) : low ? (
-        <span className="text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full w-fit mb-1">
-          ⚠ {product.stockQty} {product.unit} left
-        </span>
+        <span className="text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full w-fit mb-1">⚠ {product.stockQty} {product.unit}</span>
       ) : (
-        <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full w-fit mb-1">
-          ✓ {product.stockQty} {product.unit}
-        </span>
+        <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full w-fit mb-1">✓ {product.stockQty} {product.unit}</span>
       )}
 
-      <p className="text-base font-bold text-blue-600 mt-1 mb-3">
-        {fmt(product.mrp)}
-        <span className="text-xs font-normal text-slate-400">/{product.unit}</span>
+      <p className="text-base font-bold text-blue-600 mt-1 mb-2">
+        {fmt(product.mrp)}<span className="text-xs font-normal text-slate-400">/{product.unit}</span>
       </p>
 
-      {/* Alternatives suggestion */}
-      {oos && product.suggestions.length > 0 && (
-        <p className="text-xs text-amber-600 mb-2">
-          Try: {product.suggestions.map(s => s.name).join(', ')}
-        </p>
+      {oos && product.suggestions?.length > 0 && (
+        <p className="text-xs text-amber-600 mb-2">Try: {product.suggestions.map(s => s.name).join(', ')}</p>
       )}
 
-      {/* Quick add buttons */}
       <div className="flex gap-1.5 mt-auto flex-wrap">
         {(product.quickButtons ?? [1]).map(qty => (
           <button

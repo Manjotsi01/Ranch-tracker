@@ -13,11 +13,13 @@ const AnimalList   = lazy(() => import('./pages/dairy/AnimalList'));
 const AnimalDetail = lazy(() => import('./pages/dairy/AnimalDetail'));
 const FodderModule = lazy(() => import('./pages/dairy/FodderModule'));
 
-// Shop (lazy as well to avoid chunk issues)
-const ShopOverview = lazy(() => import('./pages/shop/dashboard'));
-const POS          = lazy(() => import('./pages/shop/pos'));
-const Processing   = lazy(() => import('./pages/shop/inventory/index'));
-const SalesHistory = lazy(() => import('./pages/shop/reports'));
+// Shop 
+const ShopOverview  = lazy(() => import('./pages/shop/dashboard'))
+const POS           = lazy(() => import('./pages/shop/pos'))
+const Inventory     = lazy(() => import('./pages/shop/inventory'))
+const Processing    = lazy(() => import('./pages/shop/processing'))
+const Wholesale     = lazy(() => import('./pages/shop/wholesale'))
+const SalesHistory  = lazy(() => import('./pages/shop/reports'))
 
 const PageLoader: React.FC = () => (
   <div className="flex items-center justify-center min-h-[40vh]">
@@ -54,11 +56,13 @@ export default function App() {
           <Route path="/dairy/:type/:id" element={withSuspense(<AnimalDetail />)} />
           <Route path="/dairy/fodder" element={withSuspense(<FodderModule />)} />
 
-          {/* Shop */}
-          <Route path="/shop" element={withSuspense(<ShopOverview />)} />
-          <Route path="/shop/pos" element={withSuspense(<POS />)} />
-          <Route path="/shop/processing" element={withSuspense(<Processing />)} />
-          <Route path="/shop/sales" element={withSuspense(<SalesHistory />)} />
+         {/* Shop */}
+<Route path="/shop" element={withSuspense(<ShopOverview />)} />
+<Route path="/shop/pos" element={withSuspense(<POS />)} />
+<Route path="/shop/inventory" element={withSuspense(<Inventory />)} />
+<Route path="/shop/processing" element={withSuspense(<Processing />)} />
+<Route path="/shop/wholesale" element={withSuspense(<Wholesale />)} />
+<Route path="/shop/reports" element={withSuspense(<SalesHistory />)} />
 
           {/* Fallback route (VERY IMPORTANT for Vercel refresh) */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

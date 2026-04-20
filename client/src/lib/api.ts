@@ -219,59 +219,70 @@ export const dairyApi = {
 
 // ─── SHOP API ─────────────────────────────────────────────
 export const shopApi = {
-  // MILK
-  getMilkEntries: async (params?: any) =>
-    (await api.get('/milk', { params })).data.data,
+  // ── MILK ────────────────────────────────────────────────────────────────────
+  getMilkEntries: async (params?: Record<string, string>) =>
+    (await api.get('/shop/milk', { params })).data.data,
 
   getMilkStock: async (date?: string) =>
-    (await api.get('/milk/stock', { params: { date } })).data.data,
+    (await api.get('/shop/milk/stock', { params: { date } })).data.data,
 
-  addMilkEntry: async (data: any) =>
-    (await api.post('/milk', data)).data.data,
+  addMilkEntry: async (data: {
+    date: string; shift: 'MORNING' | 'EVENING'; quantityLiters: number
+    fat?: number; snf?: number; source: 'OWN' | 'PURCHASED'; notes?: string
+  }) => (await api.post('/shop/milk', data)).data.data,
 
-  // PRODUCTS
-  getProducts: async () =>
-    (await api.get('/products')).data.data,
+  // ── PRODUCTS ────────────────────────────────────────────────────────────────
+  getProducts: async (activeOnly = true) =>
+    (await api.get('/shop/products', { params: { all: activeOnly ? undefined : 'true' } })).data.data,
 
-  createProduct: async (data: any) =>
-    (await api.post('/products', data)).data.data,
+  createProduct: async (data: unknown) =>
+    (await api.post('/shop/products', data)).data.data,
 
-  updateProduct: async (id: string, data: any) =>
-    (await api.patch(`/products/${id}`, data)).data.data,
+  updateProduct: async (id: string, data: unknown) =>
+    (await api.patch(`/shop/products/${id}`, data)).data.data,
 
   deleteProduct: async (id: string) =>
-    (await api.delete(`/products/${id}`)).data.data,
+    (await api.delete(`/shop/products/${id}`)).data.data,
 
-  // SALES
-  getSales: async (params?: any) =>
-    (await api.get('/sales', { params })).data.data,
+  adjustStock: async (id: string, delta: number) =>
+    (await api.patch(`/shop/products/${id}/stock/adjust`, { delta })).data.data,
 
-  createSale: async (data: any) =>
-    (await api.post('/sales', data)).data.data,
+  setStock: async (id: string, qty: number) =>
+    (await api.patch(`/shop/products/${id}/stock/set`, { qty })).data.data,
 
-  // WHOLESALE
-  getWholesaleSales: async (params?: any) =>
-    (await api.get('/wholesale', { params })).data.data,
+  // ── SALES (POS) ─────────────────────────────────────────────────────────────
+  getSales: async (params?: Record<string, unknown>) =>
+    (await api.get('/shop/sales', { params })).data.data,
 
-  createWholesaleSale: async (data: any) =>
-    (await api.post('/wholesale', data)).data.data,
-  
+  createSale: async (data: {
+    items: { productId: string; quantity: number; unitPrice: number }[]
+    paymentMode: 'CASH' | 'UPI'; customerName?: string
+  }) => (await api.post('/shop/sales', data)).data.data,
+
+  // ── WHOLESALE ────────────────────────────────────────────────────────────────
+  getWholesaleSales: async (params?: Record<string, string>) =>
+    (await api.get('/shop/wholesale', { params })).data.data,
+
+  createWholesaleSale: async (data: unknown) =>
+    (await api.post('/shop/wholesale', data)).data.data,
+
+  // FIX: was /wholesale/:id/received already in frontend, now backend matches
   markWholesaleReceived: async (id: string) =>
-  (await api.patch(`/wholesale/${id}/received`)).data.data,
+    (await api.patch(`/shop/wholesale/${id}/received`)).data.data,
 
-  // EXPENSES
-  getExpenses: async (params?: any) =>
-    (await api.get('/expenses', { params })).data.data,
+  // ── EXPENSES ────────────────────────────────────────────────────────────────
+  getExpenses: async (params?: Record<string, string>) =>
+    (await api.get('/shop/expenses', { params })).data.data,
 
-  upsertExpense: async (data: any) =>
-    (await api.post('/expenses', data)).data.data,
+  upsertExpense: async (data: unknown) =>
+    (await api.post('/shop/expenses', data)).data.data,
 
-  // REPORTS
+  // ── REPORTS ─────────────────────────────────────────────────────────────────
   getDailyReport: async (date?: string) =>
-    (await api.get('/reports/daily', { params: { date } })).data.data,
+    (await api.get('/shop/reports/daily', { params: { date } })).data.data,
 
   getMonthlyReport: async (month: string) =>
-    (await api.get('/reports/monthly', { params: { month } })).data.data,
-} 
+    (await api.get('/shop/reports/monthly', { params: { month } })).data.data,
+}
 
 export default api;

@@ -1,3 +1,4 @@
+// server/src/routes/shop.routes.ts
 import { Router, Request, Response } from 'express'
 import asyncHandler from 'express-async-handler'
 import { z } from 'zod'
@@ -5,9 +6,11 @@ import * as svc from '../services/shop.service'
 
 const router = Router()
 
-const ok  = (res: Response, data: unknown, status = 200) => res.status(status).json({ success: true, data })
+const ok = (res: Response, data: unknown, status = 200) =>
+  res.status(status).json({ success: true, data })
+
 const dateRx = /^\d{4}-\d{2}-\d{2}$/
-const id24   = z.string().length(24)
+const id24 = z.string().length(24)
 
 // ─── MILK ─────────────────────────────────────────────────────────────────────
 router.get('/milk', asyncHandler(async (req, res) => {
@@ -46,6 +49,7 @@ router.post('/products', asyncHandler(async (req, res) => {
     stockQty:          z.number().min(0).optional(),
     quickButtons:      z.array(z.number().positive()).max(6).optional(),
     lowStockThreshold: z.number().min(0).optional(),
+    isActive:          z.boolean().optional(),
   }).parse(req.body)
   ok(res, await svc.createProduct(body), 201)
 }))
@@ -57,7 +61,7 @@ router.patch('/products/:id', asyncHandler(async (req, res) => {
 
 router.patch('/products/:id/stock/adjust', asyncHandler(async (req, res) => {
   id24.parse(req.params.id)
-  const { delta } = z.object({ delta: z.number().min(1) }).parse(req.body)
+  const { delta } = z.object({ delta: z.number() }).parse(req.body)
   ok(res, await svc.adjustStock(req.params.id, delta))
 }))
 
@@ -72,7 +76,7 @@ router.delete('/products/:id', asyncHandler(async (req, res) => {
   ok(res, await svc.deleteProduct(req.params.id))
 }))
 
-// ─── SALES ────────────────────────────────────────────────────────────────────
+// ─── SALES (POS) ──────────────────────────────────────────────────────────────
 router.get('/sales', asyncHandler(async (req, res) => {
   const p = req.query as Record<string, string>
   ok(res, await svc.getSales({ ...p, page: +p.page || 1, limit: +p.limit || 50 }))
@@ -109,6 +113,13 @@ router.post('/wholesale', asyncHandler(async (req, res) => {
   ok(res, await svc.createWholesaleSale(body), 201)
 }))
 
+// FIX: was /wholesale/:id/payment — frontend calls /wholesale/:id/received
+router.patch('/wholesale/:id/received', asyncHandler(async (req, res) => {
+  id24.parse(req.params.id)
+  ok(res, await svc.markWholesalePaymentReceived(req.params.id))
+}))
+
+// keep old route alive so nothing crashes if cached
 router.patch('/wholesale/:id/payment', asyncHandler(async (req, res) => {
   id24.parse(req.params.id)
   ok(res, await svc.markWholesalePaymentReceived(req.params.id))
@@ -132,14 +143,18 @@ router.post('/expenses', asyncHandler(async (req, res) => {
 }))
 
 // ─── REPORTS ──────────────────────────────────────────────────────────────────
+// FIX: was missing GET /reports/daily — caused Dashboard crash
+router.get('/reports/daily', asyncHandler(async (req, res) => {
+  const { date } = req.query as { date?: string }
+  ok(res, await svc.getDailyReport(date))
+}))
+
 router.get('/reports/monthly', asyncHandler(async (req, res) => {
   const { month } = req.query as { month?: string }
-
   if (!month || !/^\d{4}-\d{2}$/.test(month)) {
     res.status(400).json({ success: false, message: 'month required (YYYY-MM)' })
     return
   }
-
   ok(res, await svc.getMonthlyReport(month))
 }))
 
