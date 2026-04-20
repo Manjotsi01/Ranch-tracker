@@ -15,16 +15,14 @@ import dashboardRoutes  from './routes/dashboard.routes';
 import dairyRoutes      from './routes/dairy.routes';
 import shopRoutes       from './routes/shop.routes';
 import agricultureRoutes from './routes/agriculture.routes';
+import reportsRoutes from './routes/reports.routes'
 
 const app = express();
 
-// ── 1. CORS — must be FIRST, before everything else ──────────────────────────
-// This is why your requests were blocked: CORS was either missing or
-// registered after other middleware, so OPTIONS preflight never got a response.
 const allowedOrigins = [
-  env.CLIENT_ORIGIN,                    // https://ranch-tracker.vercel.app
-  'http://localhost:5173',              // Vite dev
-  'http://localhost:3000',              // CRA dev fallback
+  env.CLIENT_ORIGIN,                    
+  'http://localhost:5173',             
+  'http://localhost:3000',           
 ];
 
 app.use(cors({
@@ -38,9 +36,9 @@ app.use(cors({
   methods:            ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders:     ['Content-Type', 'Authorization', 'X-Requested-With'],
   exposedHeaders:     ['X-Total-Count'],
-  credentials:        true,   // allow cookies / Authorization header
-  optionsSuccessStatus: 200,  // some legacy browsers choke on 204
-  maxAge:             86_400, // cache preflight for 24 h
+  credentials:        true,   
+  optionsSuccessStatus: 200,  
+  maxAge:             86_400, 
 }));
 
 // Explicitly handle OPTIONS for all routes (required for credentials:true)
@@ -74,6 +72,7 @@ app.use(`${api}/dashboard`,   dashboardRoutes);
 app.use(`${api}/dairy`,       dairyRoutes);
 app.use(`${api}/shop`,        shopRoutes);
 app.use(`${api}/agriculture`, agricultureRoutes);
+app.use(`${api}/reports`, reportsRoutes);
 
 // ── 8. 404 handler ────────────────────────────────────────────────────────────
 app.use((_req: Request, res: Response) => {
