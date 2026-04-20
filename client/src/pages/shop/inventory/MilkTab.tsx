@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Plus, Droplets } from 'lucide-react'
-import { useMilk } from '../../../hooks/useMilk.ts'
+import { useMilk } from '../../../hooks/useMilk'
 
 const today  = () => new Date().toISOString().slice(0, 10)
 const fmtDate = (d: string) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
