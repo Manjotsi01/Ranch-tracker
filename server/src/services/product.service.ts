@@ -23,3 +23,25 @@ export async function updateProduct(id: string, data: unknown) {
 export async function deleteProduct(id: string) {
   return Product.findByIdAndDelete(id)
 }
+
+export const getProducts = getAllProducts
+
+export async function getProductById(id: string) {
+  return Product.findById(id)
+}
+
+export async function adjustStock(id: string, amount: number) {
+  return Product.findByIdAndUpdate(
+    id,
+    { $inc: { stock: amount } },
+    { new: true }
+  )
+}
+
+export async function setStock(id: string, stock: number) {
+  return Product.findByIdAndUpdate(
+    id,
+    { stock },
+    { new: true }
+  )
+}
