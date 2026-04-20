@@ -533,6 +533,9 @@ export interface DailyReport {
   wholesale: { revenue: number; liters: number }
   totalRevenue: number
   pendingPayments: { total: number; count: number }
+   milkCollected: number
+  sales: number
+  profit: number
 }
 
 export interface MonthlyReport {
