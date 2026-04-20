@@ -3,28 +3,32 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 import Layout from './components/layout/Layout';
 import Dashboard from './pages/dashboard';
-
-// Agriculture
 import AgricultureIndex from './pages/agriculture';
 import CropDetail from './pages/agriculture/CropDetail';
 import SeasonDetail from './pages/agriculture/SeasonDetail';
 
-// Dairy (lazy)
+// Dairy (lazy for code-splitting)
 const DairyIndex   = lazy(() => import('./pages/dairy'));
 const AnimalList   = lazy(() => import('./pages/dairy/AnimalList'));
 const AnimalDetail = lazy(() => import('./pages/dairy/AnimalDetail'));
 const FodderModule = lazy(() => import('./pages/dairy/FodderModule'));
 
-// Shop (FIXED PATHS)
-import ShopOverview from './pages/shop/dashboard';
-import POS from './pages/shop/pos';
-import Processing from './pages/shop/inventory';
-import SalesHistory from './pages/shop/reports';
+// Shop (lazy as well to avoid chunk issues)
+const ShopOverview = lazy(() => import('./pages/shop/dashboard'));
+const POS          = lazy(() => import('./pages/shop/pos'));
+const Processing   = lazy(() => import('./pages/shop/inventory'));
+const SalesHistory = lazy(() => import('./pages/shop/reports'));
 
-const PageLoader = () => (
+const PageLoader: React.FC = () => (
   <div className="flex items-center justify-center min-h-[40vh]">
     <div className="w-8 h-8 border-[3px] border-blue-600 border-t-transparent rounded-full animate-spin" />
   </div>
+);
+
+const withSuspense = (Component: React.ReactNode) => (
+  <Suspense fallback={<PageLoader />}>
+    {Component}
+  </Suspense>
 );
 
 export default function App() {
@@ -45,27 +49,19 @@ export default function App() {
           <Route path="/agriculture/seasons/:seasonId" element={<SeasonDetail />} />
 
           {/* Dairy */}
-          <Route path="/dairy" element={
-            <Suspense fallback={<PageLoader />}><DairyIndex /></Suspense>
-          } />
-
-          <Route path="/dairy/:type" element={
-            <Suspense fallback={<PageLoader />}><AnimalList /></Suspense>
-          } />
-
-          <Route path="/dairy/:type/:id" element={
-            <Suspense fallback={<PageLoader />}><AnimalDetail /></Suspense>
-          } />
-
-          <Route path="/dairy/fodder" element={
-            <Suspense fallback={<PageLoader />}><FodderModule /></Suspense>
-          } />
+          <Route path="/dairy" element={withSuspense(<DairyIndex />)} />
+          <Route path="/dairy/:type" element={withSuspense(<AnimalList />)} />
+          <Route path="/dairy/:type/:id" element={withSuspense(<AnimalDetail />)} />
+          <Route path="/dairy/fodder" element={withSuspense(<FodderModule />)} />
 
           {/* Shop */}
-          <Route path="/shop" element={<ShopOverview />} />
-          <Route path="/shop/pos" element={<POS />} />
-          <Route path="/shop/processing" element={<Processing />} />
-          <Route path="/shop/sales" element={<SalesHistory />} />
+          <Route path="/shop" element={withSuspense(<ShopOverview />)} />
+          <Route path="/shop/pos" element={withSuspense(<POS />)} />
+          <Route path="/shop/processing" element={withSuspense(<Processing />)} />
+          <Route path="/shop/sales" element={withSuspense(<SalesHistory />)} />
+
+          {/* Fallback route (VERY IMPORTANT for Vercel refresh) */}
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
 
         </Route>
       </Routes>

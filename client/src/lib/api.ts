@@ -217,26 +217,38 @@ export const dairyApi = {
   updateFodderStock:(id: string, data: unknown)                              => api.put(`/dairy/fodder/stock/${encodeURIComponent(id)}`, data),
 };
 
-// ─── Shop API ─────────────────────────────────────────────────────────────────
+// ─── SHOP API ─────────────────────────────────────────────
 export const shopApi = {
 
   // Milk
-  addMilkEntry:  (data: unknown) => api.post('/shop/milk', data),
-  getMilkEntries:(params?: Record<string, string>) =>
+  addMilkEntry: (data: unknown) =>
+    api.post('/shop/milk', data),
+
+  getMilkEntries: (params?: Record<string, string>) =>
     api.get('/shop/milk', { params }),
-  getMilkStock:  (date?: string) =>
-    api.get('/shop/milk/stock', { params: { date } }),
+
+  getMilkStock: (date?: string) =>
+    api.get('/shop/milk/stock', {
+      params: date ? { date } : {},
+    }),
 
   // Expenses
-  upsertExpense: (data: unknown) => api.post('/shop/expenses', data),
-  getExpenses:   (params?: Record<string, string>) =>
+  upsertExpense: (data: unknown) =>
+    api.post('/shop/expenses', data),
+
+  getExpenses: (params?: Record<string, string>) =>
     api.get('/shop/expenses', { params }),
-  getMakingPrice:(date?: string) =>
-    api.get('/shop/expenses/making-price', { params: { date } }),
+
+  getMakingPrice: (date?: string) =>
+    api.get('/shop/expenses/making-price', {
+      params: date ? { date } : {},
+    }),
 
   // Products
   getProducts: (all?: boolean) =>
-    api.get('/shop/products', { params: all ? { all: true } : {} }),
+    api.get('/shop/products', {
+      params: all ? { all: true } : {},
+    }),
 
   createProduct: (data: unknown) =>
     api.post('/shop/products', data),
@@ -275,10 +287,14 @@ export const shopApi = {
 
   // Reports
   getDailyReport: (date?: string) =>
-    api.get('/shop/reports/daily', { params: { date } }),
+    api.get('/shop/reports/daily', {
+      params: date ? { date } : {},
+    }),
 
   getMonthlyReport: (month?: string) =>
-    api.get('/shop/reports/monthly', { params: { month } }),
+    api.get('/shop/reports/monthly', {
+      params: month ? { month } : {},
+    }),
 };
 
 export default api;
