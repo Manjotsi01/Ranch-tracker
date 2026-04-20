@@ -12,8 +12,9 @@ export function useMilk() {
     setLoading(true)
     setError(null)
     try {
-      const res = await shopApi.getMilkEntries(params)
-      setEntries(res.data.data)
+      // shopApi.getMilkEntries already returns unwrapped data
+      const data = await shopApi.getMilkEntries(params)
+      setEntries(data)  // ✅ was: res.data.data (double unwrap)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to load milk entries')
     } finally {
@@ -23,8 +24,8 @@ export function useMilk() {
 
   const fetchStock = useCallback(async (date?: string) => {
     try {
-      const res = await shopApi.getMilkStock(date)
-      setStock(res.data.data)
+      const data = await shopApi.getMilkStock(date)
+      setStock(data)  // ✅ was: res.data.data (double unwrap)
     } catch {
       // ignore
     }
@@ -42,16 +43,13 @@ export function useMilk() {
     setLoading(true)
     setError(null)
     try {
-      const res = await shopApi.addMilkEntry(data)
-      const entry = res.data.data 
-
+      const entry = await shopApi.addMilkEntry(data)  // ✅ already unwrapped
       setEntries(prev => [
         entry,
         ...prev.filter(
           e => !(e.date.slice(0, 10) === data.date && e.shift === data.shift)
         )
       ])
-
       return entry
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Failed to add entry'
@@ -62,13 +60,5 @@ export function useMilk() {
     }
   }, [])
 
-  return {
-    entries,
-    stock,
-    loading,
-    error,
-    fetchEntries,
-    fetchStock,
-    addEntry
-  }
+  return { entries, stock, loading, error, fetchEntries, fetchStock, addEntry }
 }

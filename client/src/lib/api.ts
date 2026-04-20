@@ -255,6 +255,9 @@ export const shopApi = {
 
   createWholesaleSale: async (data: any) =>
     (await api.post('/wholesale', data)).data.data,
+  
+  markWholesaleReceived: async (id: string) =>
+  (await api.patch(`/wholesale/${id}/received`)).data.data,
 
   // EXPENSES
   getExpenses: async (params?: any) =>
