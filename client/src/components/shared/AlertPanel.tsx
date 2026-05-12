@@ -1,6 +1,6 @@
 // client/src/components/shared/AlertPanel.tsx
 import { X, AlertTriangle, Info, CheckCircle, XCircle } from 'lucide-react';
-import { getAlertColor, formatRelativeTime, getModuleColor } from '../../lib/utils';
+import { formatRelativeTime } from '../../lib/utils';
 import type { Alert } from '../../types';
 
 interface AlertPanelProps {
@@ -116,8 +116,7 @@ export default function AlertPanel({
     >
       {alerts.map(alert => {
         const styles      = TYPE_STYLES[alert.type] ?? TYPE_STYLES.info;
-        const moduleColor = getModuleColor(alert.module);
-
+       
         return (
           <div
             key={alert.id}
