@@ -20,106 +20,109 @@ export default function Layout() {
     return () => window.removeEventListener('resize', check);
   }, []);
 
-  // Close sidebar on route change (mobile)
-  useEffect(() => {
-    if (isMobile) setMobileOpen(false);
-  }, [isMobile]);
-
-  const SW = isMobile ? 0 : collapsed ? 60 : 220;
+  const SW = isMobile ? 0 : collapsed ? 60 : 230;
 
   return (
-    <div style={{
-      display: 'flex',
-      height: '100dvh',
-      width: '100vw',
-      overflow: 'hidden',
-      background: '#080c10',
-      position: 'relative',
-    }}>
-      {/* Mobile backdrop overlay */}
-      {mobileOpen && (
+    <div
+      style={{
+        display: 'flex',
+        height: '100dvh',
+        width: '100vw',
+        overflow: 'hidden',
+        background: '#f0f4f8',
+        position: 'relative',
+      }}
+    >
+      {/* Mobile backdrop */}
+      {isMobile && mobileOpen && (
         <div
           onClick={() => setMobileOpen(false)}
           style={{
             position: 'fixed',
             inset: 0,
             zIndex: 98,
-            background: 'rgba(0,0,0,0.65)',
-            backdropFilter: 'blur(4px)',
-            WebkitBackdropFilter: 'blur(4px)',
-            transition: 'opacity 0.2s ease',
+            background: 'rgba(0,0,0,0.45)',
+            backdropFilter: 'blur(3px)',
+            WebkitBackdropFilter: 'blur(3px)',
           }}
+          aria-hidden="true"
         />
       )}
 
       {/* Desktop Sidebar */}
       {!isMobile && (
-        <div style={{
-          width: SW,
-          minWidth: SW,
-          maxWidth: SW,
-          flexShrink: 0,
-          height: '100dvh',
-          zIndex: 10,
-          transition: 'width 0.25s cubic-bezier(0.4,0,0.2,1), min-width 0.25s cubic-bezier(0.4,0,0.2,1), max-width 0.25s cubic-bezier(0.4,0,0.2,1)',
-          overflow: 'hidden',
-        }}>
+        <div
+          style={{
+            width: SW,
+            minWidth: SW,
+            maxWidth: SW,
+            height: '100dvh',
+            flexShrink: 0,
+            zIndex: 10,
+            transition: 'width 0.22s cubic-bezier(0.4,0,0.2,1), min-width 0.22s, max-width 0.22s',
+            overflow: 'hidden',
+          }}
+        >
           <Sidebar
             collapsed={collapsed}
             onToggle={() => setCollapsed(c => !c)}
-            isMobile={false}
           />
         </div>
       )}
 
-      {/* Mobile Sidebar (drawer overlay) */}
+      {/* Mobile Sidebar drawer */}
       {isMobile && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          height: '100dvh',
-          zIndex: 99,
-          width: 240,
-          transform: mobileOpen ? 'translateX(0)' : 'translateX(-100%)',
-          transition: 'transform 0.28s cubic-bezier(0.4,0,0.2,1)',
-          willChange: 'transform',
-        }}>
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            height: '100dvh',
+            width: 240,
+            zIndex: 99,
+            transform: mobileOpen ? 'translateX(0)' : 'translateX(-100%)',
+            transition: 'transform 0.25s cubic-bezier(0.4,0,0.2,1)',
+          }}
+        >
           <Sidebar
             collapsed={false}
             onToggle={() => setMobileOpen(false)}
-            isMobile={true}
+            isMobile
             onClose={() => setMobileOpen(false)}
           />
         </div>
       )}
 
       {/* Main content column */}
-      <div style={{
-        flex: 1,
-        minWidth: 0,
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100dvh',
-        overflow: 'hidden',
-      }}>
-        {/* Topbar */}
+      <div
+        style={{
+          flex: 1,
+          minWidth: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100dvh',
+          overflow: 'hidden',
+        }}
+      >
         <Topbar
           collapsed={collapsed}
-          onMenuClick={() => isMobile ? setMobileOpen(o => !o) : setCollapsed(c => !c)}
+          onMenuClick={() =>
+            isMobile ? setMobileOpen(o => !o) : setCollapsed(c => !c)
+          }
           isMobile={isMobile}
         />
 
-        {/* Scrollable page content */}
-        <main style={{
-          flex: 1,
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          padding: isMobile ? '16px 14px' : '20px 24px',
-          background: '#080c10',
-          scrollbarWidth: 'thin',
-          scrollbarColor: '#1e2d3d #0d1117',
-        }}>
+        {/* Page content */}
+        <main
+          className="scrollbar-light"
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            background: '#f0f4f8',
+            padding: isMobile ? '16px 14px' : '24px 28px',
+          }}
+        >
           <Outlet />
         </main>
       </div>

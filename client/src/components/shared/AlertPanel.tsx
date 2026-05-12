@@ -4,95 +4,220 @@ import { getAlertColor, formatRelativeTime, getModuleColor } from '../../lib/uti
 import type { Alert } from '../../types';
 
 interface AlertPanelProps {
-  alerts?: Alert[];
+  alerts?:   Alert[];
   onDismiss?: (id: string) => void;
-  loading?: boolean;
+  loading?:  boolean;
+  /** Compact variant — smaller padding, used in right sidebar */
+  compact?:  boolean;
 }
 
 const AlertIcon = ({ type }: { type: string }) => {
-  const cls = 'w-3.5 h-3.5 flex-shrink-0';
+  const size = 14;
   switch (type) {
-    case 'danger':  return <XCircle className={cls} />;
-    case 'warning': return <AlertTriangle className={cls} />;
-    case 'success': return <CheckCircle className={cls} />;
-    default:        return <Info className={cls} />;
+    case 'danger':  return <XCircle       size={size} />;
+    case 'warning': return <AlertTriangle size={size} />;
+    case 'success': return <CheckCircle   size={size} />;
+    default:        return <Info          size={size} />;
   }
 };
 
-export default function AlertPanel({ alerts = [], onDismiss, loading = false }: AlertPanelProps) {
+const TYPE_STYLES: Record<string, {
+  bg: string; border: string; icon: string; badge: string; badgeText: string;
+}> = {
+  danger: {
+    bg:        '#fef2f2',
+    border:    '#fecaca',
+    icon:      '#ef4444',
+    badge:     '#fee2e2',
+    badgeText: '#b91c1c',
+  },
+  warning: {
+    bg:        '#fffbeb',
+    border:    '#fde68a',
+    icon:      '#f59e0b',
+    badge:     '#fef3c7',
+    badgeText: '#92400e',
+  },
+  success: {
+    bg:        '#ecfdf5',
+    border:    '#a7f3d0',
+    icon:      '#10b981',
+    badge:     '#d1fae5',
+    badgeText: '#065f46',
+  },
+  info: {
+    bg:        '#eff6ff',
+    border:    '#bfdbfe',
+    icon:      '#3b82f6',
+    badge:     '#dbeafe',
+    badgeText: '#1e40af',
+  },
+};
+
+export default function AlertPanel({
+  alerts  = [],
+  onDismiss,
+  loading = false,
+  compact = false,
+}: AlertPanelProps) {
+  /* ── Loading skeletons ── */
   if (loading) {
     return (
-      <div className="space-y-2" aria-busy="true" aria-label="Loading alerts">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }} aria-busy="true">
         {[1, 2, 3].map(i => (
-          <div key={i} className="skeleton h-12 w-full rounded-xl" />
+          <div
+            key={i}
+            className="skeleton"
+            style={{ height: compact ? 52 : 64, borderRadius: 12 }}
+          />
         ))}
       </div>
     );
   }
 
+  /* ── Empty state ── */
   if (alerts.length === 0) {
     return (
       <div
-        className="flex flex-col items-center justify-center py-10 text-center"
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '28px 16px',
+          gap: 8,
+        }}
         role="status"
-        aria-label="No active alerts"
       >
-        <CheckCircle className="w-7 h-7 text-emerald-500/25 mb-2" aria-hidden="true" />
-        <p className="text-xs text-[#2a4a3a]">All clear — no active alerts</p>
+        <div
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: '50%',
+            background: '#ecfdf5',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <CheckCircle size={20} style={{ color: '#10b981' }} />
+        </div>
+        <p style={{ fontSize: 13, color: '#10b981', fontWeight: 600, margin: 0 }}>All clear</p>
+        <p style={{ fontSize: 12, color: '#94a3b8', margin: 0 }}>No active alerts</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-2" role="list" aria-label="System alerts">
+    <div
+      style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
+      role="list"
+      aria-label="System alerts"
+    >
       {alerts.map(alert => {
-        const colors      = getAlertColor(alert.type);
+        const styles      = TYPE_STYLES[alert.type] ?? TYPE_STYLES.info;
         const moduleColor = getModuleColor(alert.module);
 
         return (
           <div
             key={alert.id}
             role="listitem"
-            className={`
-              flex items-start gap-3 p-3 rounded-xl border group
-              transition-all duration-200 animate-fade-in
-              ${colors.bg} ${colors.border}
-            `}
+            className="animate-fade-in"
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 10,
+              padding: compact ? '10px 12px' : '12px 14px',
+              borderRadius: 12,
+              background: styles.bg,
+              border: `1px solid ${styles.border}`,
+              position: 'relative',
+              transition: 'box-shadow 0.15s',
+            }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)';
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLElement).style.boxShadow = 'none';
+            }}
           >
             {/* Icon */}
-            <span className={`mt-0.5 flex-shrink-0 ${colors.text}`} aria-hidden="true">
+            <span
+              style={{ color: styles.icon, flexShrink: 0, marginTop: 1 }}
+              aria-hidden="true"
+            >
               <AlertIcon type={alert.type} />
             </span>
 
             {/* Content */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, flexWrap: 'wrap' }}>
+                {/* Module badge */}
                 <span
-                  className="text-[9px] font-bold uppercase tracking-[0.12em] font-display px-1.5 py-0.5 rounded"
-                  style={{ color: moduleColor, background: `${moduleColor}18` }}
+                  style={{
+                    fontSize: 9,
+                    fontWeight: 800,
+                    letterSpacing: '0.1em',
+                    textTransform: 'uppercase',
+                    padding: '2px 7px',
+                    borderRadius: 20,
+                    background: styles.badge,
+                    color: styles.badgeText,
+                    fontFamily: "'Syne', sans-serif",
+                  }}
                 >
                   {alert.module}
                 </span>
+                {/* Time */}
                 <time
-                  className="text-[10px] text-[#2a4a3a]"
+                  style={{ fontSize: 10, color: '#94a3b8' }}
                   dateTime={alert.createdAt}
                 >
                   {formatRelativeTime(alert.createdAt)}
                 </time>
               </div>
-              <p className={`text-xs leading-relaxed ${colors.text}`}>
+
+              <p
+                style={{
+                  fontSize: compact ? 12 : 13,
+                  color: '#374151',
+                  lineHeight: 1.5,
+                  margin: 0,
+                  fontFamily: "'DM Sans', sans-serif",
+                }}
+              >
                 {alert.message}
               </p>
             </div>
 
-            {/* Dismiss */}
+            {/* Dismiss button */}
             {onDismiss && (
               <button
                 onClick={() => onDismiss(alert.id)}
-                className="opacity-0 group-hover:opacity-100 text-[#2a4a3a] hover:text-[#6a8a7a] transition-all duration-200 flex-shrink-0 mt-0.5"
-                aria-label={`Dismiss alert: ${alert.message}`}
+                aria-label={`Dismiss: ${alert.message}`}
+                style={{
+                  flexShrink: 0,
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#9ca3af',
+                  padding: 2,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: 6,
+                  transition: 'color 0.15s, background 0.15s',
+                }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLElement).style.color = '#374151';
+                  (e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.06)';
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLElement).style.color = '#9ca3af';
+                  (e.currentTarget as HTMLElement).style.background = 'transparent';
+                }}
               >
-                <X className="w-3 h-3" />
+                <X size={13} />
               </button>
             )}
           </div>

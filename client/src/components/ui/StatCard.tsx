@@ -3,20 +3,77 @@ import { cn, formatCurrency, formatNumber, formatPercent, getTrendColor } from '
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import type { ReactNode } from 'react';
 
+/* ── Tiny SVG Sparkline ─────────────────────────────────── */
+interface SparkProps {
+  data: number[];
+  color: string;
+  height?: number;
+}
+
+function Sparkline({ data, color, height = 36 }: SparkProps) {
+  if (!data || data.length < 2) return null;
+  const w = 80;
+  const h = height;
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+
+  const points = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * w;
+    const y = h - ((v - min) / range) * (h - 4) - 2;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+
+  const areaPath =
+    `M${points.join('L')} ` +
+    `L${w},${h} L0,${h} Z`;
+
+  const uid = color.replace(/[^a-z0-9]/gi, '');
+
+  return (
+    <svg
+      width={w}
+      height={h}
+      viewBox={`0 0 ${w} ${h}`}
+      style={{ overflow: 'visible', flexShrink: 0 }}
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient id={`spark-${uid}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stopColor={color} stopOpacity="0.20" />
+          <stop offset="100%" stopColor={color} stopOpacity="0"    />
+        </linearGradient>
+      </defs>
+      <path d={areaPath} fill={`url(#spark-${uid})`} />
+      <polyline
+        points={points.join(' ')}
+        fill="none"
+        stroke={color}
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+/* ── Main StatCard ──────────────────────────────────────── */
 interface StatCardProps {
-  label: string;
-  value: string | number;
-  prefix?: string;
-  suffix?: string;
-  trend?: number;
+  label:       string;
+  value:       string | number;
+  prefix?:     string;
+  suffix?:     string;
+  trend?:      number;
   trendLabel?: string;
-  icon?: ReactNode;
+  icon?:       ReactNode;
   accentColor?: string;
-  format?: 'currency' | 'number' | 'raw';
-  compact?: boolean;
-  className?: string;
-  loading?: boolean;
-  animIndex?: number;
+  format?:     'currency' | 'number' | 'raw';
+  compact?:    boolean;
+  className?:  string;
+  loading?:    boolean;
+  animIndex?:  number;
+  /** Optional sparkline data (array of numbers, recent first → oldest last OR oldest first) */
+  sparkData?:  number[];
 }
 
 export default function StatCard({
@@ -27,18 +84,20 @@ export default function StatCard({
   trend,
   trendLabel,
   icon,
-  accentColor = '#4ade80',
+  accentColor = '#10b981',
   format = 'raw',
   compact = true,
   className,
   loading = false,
   animIndex = 0,
+  sparkData,
 }: StatCardProps) {
+  /* Format value */
   const formattedValue = (() => {
     if (loading) return '';
     if (typeof value === 'number') {
       if (format === 'currency') return formatCurrency(value, compact);
-      if (format === 'number') return formatNumber(value);
+      if (format === 'number')   return formatNumber(value);
     }
     return String(value);
   })();
@@ -49,15 +108,19 @@ export default function StatCard({
     : trend < 0 ? TrendingDown
     : Minus;
 
+  /* ── Skeleton ── */
   if (loading) {
     return (
-      <div className={cn(
-        'rounded-2xl p-4 border border-white/5 bg-[#0d1117]',
-        className
-      )}>
-        <div className="skeleton h-2.5 w-20 mb-4 rounded" />
-        <div className="skeleton h-7 w-28 mb-3 rounded" />
-        <div className="skeleton h-2 w-16 rounded" />
+      <div
+        className={cn(
+          'rounded-2xl p-5 border border-slate-100 bg-white',
+          className
+        )}
+        style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}
+      >
+        <div className="skeleton h-2.5 w-24 mb-4 rounded-md" />
+        <div className="skeleton h-8 w-32 mb-3 rounded-md" />
+        <div className="skeleton h-2 w-16 rounded-md" />
       </div>
     );
   }
@@ -65,77 +128,131 @@ export default function StatCard({
   return (
     <div
       className={cn(
-        'relative rounded-2xl p-4 border border-white/5 overflow-hidden',
-        'hover:border-white/10 transition-all duration-300 group cursor-default',
-        'animate-fade-up',
+        'kpi-card relative rounded-2xl overflow-hidden group cursor-default animate-fade-up',
+        'transition-all duration-250',
         className
       )}
       style={{
-        background: 'linear-gradient(135deg, #0d1117 0%, #111820 100%)',
-        animationDelay: `${animIndex * 0.06}s`,
+        background: '#ffffff',
+        border: '1px solid #e8eef5',
+        boxShadow: '0 1px 3px 0 rgba(0,0,0,0.05), 0 1px 2px -1px rgba(0,0,0,0.04)',
+        animationDelay: `${animIndex * 0.07}s`,
         animationFillMode: 'both',
+        padding: '20px 20px 16px',
+      }}
+      onMouseEnter={e => {
+        (e.currentTarget as HTMLElement).style.boxShadow =
+          '0 4px 12px 0 rgba(0,0,0,0.08), 0 1px 3px -1px rgba(0,0,0,0.05)';
+        (e.currentTarget as HTMLElement).style.borderColor = accentColor + '40';
+        (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)';
+      }}
+      onMouseLeave={e => {
+        (e.currentTarget as HTMLElement).style.boxShadow =
+          '0 1px 3px 0 rgba(0,0,0,0.05), 0 1px 2px -1px rgba(0,0,0,0.04)';
+        (e.currentTarget as HTMLElement).style.borderColor = '#e8eef5';
+        (e.currentTarget as HTMLElement).style.transform = 'translateY(0)';
       }}
       role="figure"
       aria-label={`${label}: ${formattedValue}${suffix ?? ''}`}
     >
-      {/* Background glow */}
+      {/* Accent top border */}
       <div
-        className="absolute -top-6 -right-6 w-20 h-20 rounded-full blur-2xl opacity-[0.07] group-hover:opacity-[0.14] transition-opacity duration-500"
-        style={{ background: accentColor }}
-        aria-hidden="true"
-      />
-
-      {/* Decorative corner accent */}
-      <div
-        className="absolute top-0 right-0 w-16 h-16 opacity-[0.03]"
         style={{
-          background: `radial-gradient(circle at top right, ${accentColor}, transparent 70%)`,
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 3,
+          background: accentColor,
+          borderRadius: '14px 14px 0 0',
+          opacity: 0.7,
         }}
         aria-hidden="true"
       />
 
-      <div className="relative">
-        {/* Label + Icon row */}
-        <div className="flex items-start justify-between mb-3">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#3a4a5a] font-display leading-none">
-            {label}
-          </p>
-          {icon && (
+      {/* Label + Icon */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+        <p
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            color: '#64748b',
+            textTransform: 'uppercase',
+            letterSpacing: '0.1em',
+            fontFamily: "'Syne', sans-serif",
+            lineHeight: 1,
+          }}
+        >
+          {label}
+        </p>
+
+        {icon && (
+          <div
+            style={{
+              padding: '7px',
+              borderRadius: 10,
+              background: accentColor + '14',
+              color: accentColor,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              transition: 'background 0.15s',
+            }}
+          >
+            <span style={{ display: 'block', width: 16, height: 16, color: accentColor }}>
+              {icon}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Value row */}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 3, marginBottom: 10 }}>
+        {prefix && (
+          <span style={{ fontSize: 15, color: accentColor + 'bb', fontWeight: 600 }}>
+            {prefix}
+          </span>
+        )}
+        <span
+          style={{
+            fontSize: 28,
+            fontWeight: 800,
+            color: '#0f172a',
+            fontFamily: "'Syne', sans-serif",
+            lineHeight: 1,
+            letterSpacing: '-0.5px',
+          }}
+        >
+          {formattedValue}
+        </span>
+        {suffix && (
+          <span style={{ fontSize: 14, color: '#94a3b8', fontWeight: 500 }}>
+            {suffix}
+          </span>
+        )}
+      </div>
+
+      {/* Trend + Sparkline */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+        <div>
+          {trend !== undefined && TrendIcon && (
             <div
-              className="p-1.5 rounded-lg flex-shrink-0 opacity-80 group-hover:opacity-100 transition-opacity"
-              style={{ background: `${accentColor}18` }}
+              className={cn('flex items-center gap-1.5', getTrendColor(trend))}
+              style={{ fontSize: 12 }}
             >
-              <span style={{ color: accentColor }} className="block w-3.5 h-3.5">
-                {icon}
-              </span>
+              <TrendIcon style={{ width: 13, height: 13, flexShrink: 0 }} />
+              <span style={{ fontWeight: 700 }}>{formatPercent(trend)}</span>
+              {trendLabel && (
+                <span style={{ color: '#94a3b8', fontWeight: 400 }}>{trendLabel}</span>
+              )}
             </div>
           )}
         </div>
 
-        {/* Value */}
-        <div className="flex items-baseline gap-1 mb-2">
-          {prefix && (
-            <span className="text-xs" style={{ color: `${accentColor}80` }}>{prefix}</span>
-          )}
-          <span
-            className="text-2xl font-bold font-display leading-none tracking-tight"
-            style={{ color: accentColor }}
-          >
-            {formattedValue}
-          </span>
-          {suffix && (
-            <span className="text-xs" style={{ color: `${accentColor}80` }}>{suffix}</span>
-          )}
-        </div>
-
-        {/* Trend */}
-        {trend !== undefined && TrendIcon && (
-          <div className={cn('flex items-center gap-1.5 text-[11px]', getTrendColor(trend))}>
-            <TrendIcon className="w-3 h-3 flex-shrink-0" />
-            <span className="font-semibold">{formatPercent(trend)}</span>
-            {trendLabel && (
-              <span className="text-[#2a3545]">{trendLabel}</span>
-            )}
+        {sparkData && sparkData.length >= 2 && (
+          <div className="kpi-sparkline">
+            <Sparkline data={sparkData} color={accentColor} height={36} />
           </div>
         )}
       </div>
