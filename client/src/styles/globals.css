@@ -5,7 +5,7 @@
    DESIGN TOKENS — RANCH TRACKER  ·  PREMIUM DARK
    Deep navy + elegant teal  ·  calm, professional, 2026
    ═══════════════════════════════════════════════════════════ */
-@theme {
+:root {
   --font-display: "Syne", sans-serif;
   --font-body:    "DM Sans", sans-serif;
   --font-mono:    "JetBrains Mono", monospace;
